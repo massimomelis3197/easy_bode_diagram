@@ -360,15 +360,15 @@
     activeLayers[layer] = !activeLayers[layer];
     ['real', 'asymptotic', 'contributions'].forEach(l => {
         const btn = document.getElementById(`btn-${l}`);
-        const iconWrap = btn.querySelector('.dock-icon-wrap');
+        const pill = btn.querySelector('.dock-pill');
         if (activeLayers[l]) {
             btn.classList.remove('opacity-50', 'dark:opacity-60', 'text-stone-600', 'dark:text-gray-300');
             btn.classList.add('text-amber-500', 'dark:text-blue-500', 'opacity-100');
-            if (iconWrap) iconWrap.classList.add('is-active');
+            if (pill) pill.classList.add('is-active');
         } else {
             btn.classList.add('opacity-50', 'dark:opacity-60', 'text-stone-600', 'dark:text-gray-300');
             btn.classList.remove('text-amber-500', 'dark:text-blue-500', 'opacity-100');
-            if (iconWrap) iconWrap.classList.remove('is-active');
+            if (pill) pill.classList.remove('is-active');
         }
     });
     if (isInterfaceExpanded) {

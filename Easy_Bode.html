@@ -52,15 +52,24 @@
         .latex-preview-box mjx-container { margin: 0 !important; text-align: center; }
         .flag-icon { width: 20px; height: 20px; object-fit: cover; border-radius: 2px; display: inline-block; }
 
-        /* Circular glow behind the icon of an active dock button */
-        .dock-icon-wrap { position: relative; }
-        .dock-icon-wrap.is-active {
+        /* Dock buttons: an elastic "pill" background behind each icon that
+           pops in with a springy bounce when its layer is toggled active. */
+        .dock-btn { position: relative; }
+        .dock-pill {
+            position: absolute;
+            inset: -6px -12px;
+            border-radius: 9999px;
             background: color-mix(in srgb, currentColor 16%, transparent);
-            box-shadow: 0 0 18px 3px color-mix(in srgb, currentColor 55%, transparent);
+            opacity: 0;
+            transform: scale(0.7);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+            z-index: 0;
+            pointer-events: none;
         }
-        .dock-icon-wrap:hover {
-            box-shadow: 0 0 14px 2px color-mix(in srgb, currentColor 45%, transparent);
-        }
+        .dock-pill.is-active { opacity: 1; transform: scale(1); }
+        .dock-btn:hover .dock-pill:not(.is-active) { opacity: 0.5; transform: scale(0.9); }
+        .dock-icon-wrap { position: relative; z-index: 1; }
+        .dock-btn > span:last-child { position: relative; z-index: 1; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col p-4 md:p-10 antialiased relative">
@@ -251,8 +260,9 @@
 
     <footer class="bg-stone-100/95 dark:bg-darkcard/95 text-stone-800 dark:text-darktext backdrop-blur-xl px-4 py-2.5 sm:px-8 sm:py-4 rounded-2xl sm:rounded-3xl shadow-2xl flex items-center gap-3 sm:gap-8 border border-black/5 dark:border-white/10">
         
-        <button onclick="toggleLayer('real')" id="btn-real" class="flex flex-col items-center gap-1 transition-all text-amber-500 dark:text-blue-500 font-bold cursor-pointer">
-            <span class="dock-icon-wrap is-active flex items-center justify-center w-8 h-8 sm:w-11 sm:h-11 rounded-full transition-all duration-300">
+        <button onclick="toggleLayer('real')" id="btn-real" class="dock-btn flex flex-col items-center gap-1 transition-all text-amber-500 dark:text-blue-500 font-bold cursor-pointer">
+            <span class="dock-pill is-active"></span>
+            <span class="dock-icon-wrap flex items-center justify-center w-8 h-8 sm:w-11 sm:h-11 rounded-full transition-all duration-300">
                 <i data-lucide="line-chart" class="w-4 h-4 sm:w-6 sm:h-6"></i>
             </span>
             <span class="text-[10px] sm:text-[14px] font-bold uppercase tracking-widest" id="lbl-real">Reale</span>
@@ -260,7 +270,8 @@
         
         <div class="w-[1px] h-5 sm:h-6 bg-stone-300 dark:bg-darkborder"></div>
         
-        <button onclick="toggleLayer('asymptotic')" id="btn-asymptotic" class="flex flex-col items-center gap-1 opacity-50 dark:opacity-60 transition-all cursor-pointer text-stone-600 dark:text-gray-300">
+        <button onclick="toggleLayer('asymptotic')" id="btn-asymptotic" class="dock-btn flex flex-col items-center gap-1 opacity-50 dark:opacity-60 transition-all cursor-pointer text-stone-600 dark:text-gray-300">
+            <span class="dock-pill"></span>
             <span class="dock-icon-wrap flex items-center justify-center w-8 h-8 sm:w-11 sm:h-11 rounded-full transition-all duration-300">
                 <i data-lucide="trending-up" class="w-4 h-4 sm:w-6 sm:h-6"></i>
             </span>
@@ -269,7 +280,8 @@
         
         <div class="w-[1px] h-5 sm:h-6 bg-stone-300 dark:bg-darkborder"></div>
         
-        <button onclick="toggleLayer('contributions')" id="btn-contributions" class="flex flex-col items-center gap-1 opacity-50 dark:opacity-60 transition-all cursor-pointer text-stone-600 dark:text-gray-300">
+        <button onclick="toggleLayer('contributions')" id="btn-contributions" class="dock-btn flex flex-col items-center gap-1 opacity-50 dark:opacity-60 transition-all cursor-pointer text-stone-600 dark:text-gray-300">
+            <span class="dock-pill"></span>
             <span class="dock-icon-wrap flex items-center justify-center w-8 h-8 sm:w-11 sm:h-11 rounded-full transition-all duration-300">
                 <i data-lucide="layers" class="w-4 h-4 sm:w-6 sm:h-6"></i>
             </span>
@@ -631,15 +643,15 @@
     activeLayers[layer] = !activeLayers[layer];
     ['real', 'asymptotic', 'contributions'].forEach(l => {
         const btn = document.getElementById(`btn-${l}`);
-        const iconWrap = btn.querySelector('.dock-icon-wrap');
+        const pill = btn.querySelector('.dock-pill');
         if (activeLayers[l]) {
             btn.classList.remove('opacity-50', 'dark:opacity-60', 'text-stone-600', 'dark:text-gray-300');
             btn.classList.add('text-amber-500', 'dark:text-blue-500', 'opacity-100');
-            if (iconWrap) iconWrap.classList.add('is-active');
+            if (pill) pill.classList.add('is-active');
         } else {
             btn.classList.add('opacity-50', 'dark:opacity-60', 'text-stone-600', 'dark:text-gray-300');
             btn.classList.remove('text-amber-500', 'dark:text-blue-500', 'opacity-100');
-            if (iconWrap) iconWrap.classList.remove('is-active');
+            if (pill) pill.classList.remove('is-active');
         }
     });
     if (isInterfaceExpanded) {
