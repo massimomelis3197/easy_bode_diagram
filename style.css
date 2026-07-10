@@ -1,0 +1,31 @@
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;600&family=Noto+Sans+SC&family=Noto+Sans+JP&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', 'Noto Sans JP', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        
+        /* Light Theme */
+        .light body { background-color: #fdfbf7; color: #1c1917; }
+        .light .card { background-color: #ffffff; border-color: #f5f2eb; }
+        
+        /* Enhanced Dark Theme for Better Contrast */
+        .dark body { background-color: #0b0f17; color: #e8edf4; }
+        .dark .card { background-color: #151b24; border-color: #2a3441; }
+        .dark input { background-color: #1c2430; color: #e8edf4; border-color: #2a3441; }
+        .dark .latex-preview-box { background-color: #151b24 !important; border-color: #2a3441 !important; }
+        
+        .fade-in-content { animation: fadeIn 0.6s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .latex-preview-box mjx-container { margin: 0 !important; text-align: center; }
+        .flag-icon { width: 20px; height: 20px; object-fit: cover; border-radius: 2px; display: inline-block; }
+
+        /* Circular glow behind the icon of an active dock button */
+        .dock-icon-wrap { position: relative; }
+        .dock-icon-wrap.is-active {
+            background: color-mix(in srgb, currentColor 16%, transparent);
+            box-shadow: 0 0 18px 3px color-mix(in srgb, currentColor 55%, transparent);
+        }
+        .dock-icon-wrap:hover {
+            box-shadow: 0 0 14px 2px color-mix(in srgb, currentColor 45%, transparent);
+        }
+    
