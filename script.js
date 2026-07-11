@@ -993,9 +993,6 @@
             }, 250);
         });
 
-        // Renders a chart off-screen at a fixed size/font, independent of the
-        // current device's viewport — this is what makes the PDF look the
-        // same whether it's generated from a phone, a tablet, or a desktop.
         // Renders a chart off-screen at a fixed size and fixed font, independent of the current device — this is what makes the exported PDF look identical whether it's generated from a phone, a tablet or a desktop.
         function renderExportChart(datasets, yLabel) {
             const FW = 1600, FH = 720;
@@ -1006,12 +1003,19 @@
 
             const gridColor = isDarkMode ? '#2a3441' : '#e5e7eb';
             const textColor = isDarkMode ? '#9aa7b8' : '#6b7280';
+            const bgColor = isDarkMode ? '#0b0f17' : '#fdfbf7';
             const xUnitLabel = currentUnit === 'Hz' ? 'Hz' : 'rad/s';
 
             const chart = new Chart(off.getContext('2d'), {
                 type: 'line',
                 data: { labels: lastFreqDisplay, datasets },
                 options: {
+                    // devicePixelRatio must be pinned to 1: left at its default,
+                    // Chart.js multiplies the canvas by the device's screen DPR
+                    // (up to 3-4x on phones), squaring the pixel count and
+                    // producing enormous, poorly-compressing export images —
+                    // this alone was the main cause of 100MB+ PDFs.
+                    devicePixelRatio: 1,
                     responsive: false, maintainAspectRatio: false, animation: false,
                     layout: { padding: { left: 10, right: 20, top: 12, bottom: 10 } },
                     scales: {
@@ -1019,9 +1023,25 @@
                         y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 18 } }, title: { display: true, text: yLabel, color: textColor, font: { size: 20, weight: '600' } } }
                     },
                     plugins: { legend: { display: false } }
-                }
+                },
+                plugins: [{
+                    // JPEG has no transparency, so paint a solid background
+                    // behind the chart before it's exported.
+                    id: 'solidBg',
+                    beforeDraw(c) {
+                        const { ctx, width, height } = c;
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'destination-over';
+                        ctx.fillStyle = bgColor;
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.restore();
+                    }
+                }]
             });
-            const img = chart.toBase64Image('image/png', 1.0);
+            // JPEG at high quality is dramatically smaller than lossless PNG
+            // for this kind of content (dense anti-aliased/dashed lines) and
+            // is visually indistinguishable in a printed report.
+            const img = chart.toBase64Image('image/jpeg', 0.92);
             chart.destroy();
             document.body.removeChild(off);
             return { img, w: FW, h: FH };
@@ -1032,7 +1052,7 @@
             const jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
             if (!jsPDFCtor) { console.error('jsPDF non disponibile'); return; }
 
-            const doc = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+            const doc = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
             const pageW = doc.internal.pageSize.getWidth();
             const pageH = doc.internal.pageSize.getHeight();
             const marginX = 15;
@@ -1168,8 +1188,8 @@
                 ensureSpace(drawH + 16);
                 sectionHeader(getText(titleId), textGray, 10);
                 y += 10;
-                doc.addImage(img, 'PNG', marginX, y, drawW, drawH);
-                y += drawH + 10;
+                doc.addImage(img, 'JPEG', marginX, y, drawW, drawH);
+                y += drawH + 20;
             }
             const { datasetsMag, datasetsPhase } = buildChartDatasets(lastMagData, lastPhaseData, lastAsympMagData, lastAsympPhaseData, lastContributionCurves);
             addChartImage(datasetsMag, 'dB', 'title-mag');
