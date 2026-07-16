@@ -197,14 +197,18 @@
             <main class="w-full space-y-4 sm:space-y-8 mb-72 pb-[100px]">
                 <div class="card p-2 sm:p-6 rounded-2xl sm:rounded-3xl border shadow-sm h-[360px] sm:h-[560px] flex flex-col" style="page-break-inside: avoid; break-inside: avoid;">
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider mb-1 sm:mb-4 px-2 pt-1 sm:px-0 sm:pt-0 text-stone-500 dark:text-gray-400" id="title-mag">Diagramma del Modulo (Magnitudo)</h2>
-                    <div class="flex-grow relative h-full">
-                        <canvas id="magnitudeChart"></canvas>
+                    <div class="flex-grow relative h-full overflow-x-auto overflow-y-hidden" style="-webkit-overflow-scrolling: touch;">
+                        <div class="h-full min-w-[640px] sm:min-w-0 relative">
+                            <canvas id="magnitudeChart"></canvas>
+                        </div>
                     </div>
                 </div>
                 <div class="card p-2 sm:p-6 rounded-2xl sm:rounded-3xl border shadow-sm h-[360px] sm:h-[560px] flex flex-col" style="page-break-inside: avoid; break-inside: avoid;">
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider mb-1 sm:mb-4 px-2 pt-1 sm:px-0 sm:pt-0 text-stone-500 dark:text-gray-400" id="title-phase">Diagramma della Fase</h2>
-                    <div class="flex-grow relative h-full">
-                        <canvas id="phaseChart"></canvas>
+                    <div class="flex-grow relative h-full overflow-x-auto overflow-y-hidden" style="-webkit-overflow-scrolling: touch;">
+                        <div class="h-full min-w-[640px] sm:min-w-0 relative">
+                            <canvas id="phaseChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </main>

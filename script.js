@@ -12,7 +12,7 @@
         
 
         const frequenciesHz = [];
-        for (let dec = -2; dec <= 5; dec += 0.05) frequenciesHz.push(Math.pow(10, dec));
+        for (let dec = -2; dec <= 9; dec += 0.05) frequenciesHz.push(Math.pow(10, dec));
 
 
     const LANG = 
@@ -458,20 +458,40 @@
             return { numStr: stripParens(numStr) || '1', denStr: stripParens(denStr) || '1' };
         }
 
-        // Numerically recovers a polynomial's coefficients from an arbitrary mathjs-parsable expression by sampling it and solving a linear system (so expressions don't need to be pre-expanded by the user).
+        // Evaluates the expression at the (maxDeg+1)-th roots of unity and takes the inverse DFT to recover the polynomial's coefficients exactly (to machine precision) for any degree <= maxDeg, no matter how widely the coefficients' magnitudes vary. Replaces an earlier Vandermonde-fit approach that silently lost high-degree poles/zeros (and misreported system order) once degree or coefficient scale grew.
         function extractPolyCoefficients(exprStr) {
-            const maxDeg = 8, n = maxDeg + 1;
+            const maxDeg = 14, N = maxDeg + 1;
             let code;
             try { code = math.compile(exprStr); } catch(e) { return [1]; }
-            const xs = [];
-            for (let i = 1; i <= n; i++) xs.push(i * 0.7 + 0.31);
-            const A = xs.map(x => { let row = []; for (let p = 0; p < n; p++) row.push(Math.pow(x, p)); return row; });
-            const b = xs.map(x => { try { return toReal(code.evaluate({ s: x })); } catch(e) { return 0; } });
-            let c;
-            try { c = math.lusolve(A, b).map(r => Array.isArray(r) ? r[0] : r); } catch(e) { return [1]; }
-            let maxAbs = Math.max(...c.map(v => Math.abs(v)), 1e-9);
+            const samples = [];
+            for (let k = 0; k < N; k++) {
+                const theta = 2 * Math.PI * k / N;
+                const zk = math.complex(Math.cos(theta), Math.sin(theta));
+                let val;
+                try { val = code.evaluate({ s: zk }); } catch(e) { val = math.complex(0, 0); }
+                samples.push(typeof val === 'number' ? math.complex(val, 0) : val);
+            }
+            const maxSample = Math.max(...samples.map(cMag), 1e-9);
+            const coeffs = [];
+            for (let j = 0; j < N; j++) {
+                let sum = math.complex(0, 0);
+                for (let k = 0; k < N; k++) {
+                    const theta = -2 * Math.PI * j * k / N;
+                    sum = math.add(sum, math.multiply(samples[k], math.complex(Math.cos(theta), Math.sin(theta))));
+                }
+                coeffs.push(math.divide(sum, N));
+            }
+            let c = coeffs.map(v => toReal(v));
+            // Noise floor scales with the sampled values' magnitude (where
+            // floating-point error actually accumulates), not with the
+            // coefficients' own max — using the latter wrongly discarded a
+            // genuinely real but comparatively small leading coefficient
+            // whenever other coefficients (e.g. the constant term) were much
+            // larger, silently under-reporting the polynomial's degree and
+            // therefore losing poles/zeros from the analysis.
+            const noiseFloor = maxSample * 1e-9;
             let deg = c.length - 1;
-            while (deg > 0 && Math.abs(c[deg]) < maxAbs * 1e-6) deg--;
+            while (deg > 0 && Math.abs(c[deg]) < noiseFloor) deg--;
             return c.slice(0, deg + 1);
         }
 
