@@ -1,6 +1,53 @@
 
         lucide.createIcons();
         let magChart, phaseChart;
+
+        // ── Click-to-activate wheel zoom ─────────────────────────────────
+        // Wheel-zoom is disabled by default on every chart so that scrolling
+        // the page while the cursor happens to pass over a chart doesn't
+        // hijack the scroll. Clicking a chart "activates" it (enables wheel
+        // zoom just for that one); clicking anywhere else deactivates all of
+        // them again. Drag-to-pan and pinch-zoom stay always available,
+        // since neither conflicts with normal page scrolling.
+        const zoomableCanvasIds = new Set();
+        function makeChartClickActivatable(chart, canvas) {
+            if (!chart || !canvas) return;
+            zoomableCanvasIds.add(canvas.id);
+            // Charts are destroyed/recreated on every recalculation, but the
+            // <canvas> element itself persists — bind the click listener
+            // only once per canvas, and always resolve the *current* chart
+            // via Chart.js's own registry (Chart.getChart) inside the
+            // handler, so it never references a stale, destroyed instance.
+            if (!canvas.dataset.zoomClickBound) {
+                canvas.dataset.zoomClickBound = '1';
+                canvas.addEventListener('click', () => activateChartZoom(canvas));
+            }
+        }
+        function activateChartZoom(activeCanvas) {
+            zoomableCanvasIds.forEach(id => {
+                const canvas = document.getElementById(id);
+                const chart = canvas && Chart.getChart(canvas);
+                if (!chart) return;
+                const isActive = canvas === activeCanvas;
+                if (chart.options && chart.options.plugins && chart.options.plugins.zoom) {
+                    chart.options.plugins.zoom.zoom.wheel.enabled = isActive;
+                    chart.update('none');
+                }
+                canvas.classList.toggle('chart-zoom-active', isActive);
+            });
+        }
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName === 'CANVAS') return;
+            zoomableCanvasIds.forEach(id => {
+                const canvas = document.getElementById(id);
+                const chart = canvas && Chart.getChart(canvas);
+                if (chart && chart.options && chart.options.plugins && chart.options.plugins.zoom) {
+                    chart.options.plugins.zoom.zoom.wheel.enabled = false;
+                    chart.update('none');
+                }
+                if (canvas) canvas.classList.remove('chart-zoom-active');
+            });
+        });
         let isDarkMode = false;
         let currentLang = 'it';
         let currentUnit = 'Hz';
@@ -8,6 +55,12 @@
         let isInterfaceExpanded = false;
 
         let lastFreqDisplay = [], lastFreqRad = [], lastMagData = [], lastPhaseData = [], lastAsympMagData = [], lastAsympPhaseData = [], lastContributionCurves = [];
+        let lastWc = null;              // gain-crossover frequency (rad/s), default sine frequency for the temporal study
+        let currentSignal = 'step';     // currently selected input signal for the Time Response Study
+        let temporalChart;              // Chart.js instance for the temporal response canvas
+        let lastTemporalData = null;    // cached { t, u, y, kpis } for the PDF export
+        let nyquistChart;                // Chart.js instance for the Nyquist canvas
+        let lastNyquistData = null;      // cached { posBranch, negBranch, P, N, Z, minDist, stable } for the PDF export
         let contributionVisibility = {};
         
 
@@ -34,7 +87,10 @@
             real: 'Reale', asymp: 'Asintoti', contrib: 'Contributi',
             lp: 'Passa-Basso', hp: 'Passa-Alto', bp: 'Passa-Banda', ap: 'Pass-Tutto', notch: 'Notch',
             absent: 'Assente', nd: 'N/D',
-            poleWord: 'Polo', zeroWord: 'Zero', ccWord: 'c.c.', originWord: 'origine'
+            poleWord: 'Polo', zeroWord: 'Zero', ccWord: 'c.c.', originWord: 'origine',
+            temporalTitle: 'Studio della Risposta Temporale', sigStep: 'Gradino Unitario', sigImpulse: 'Impulso', sigRamp: 'Rampa', sigSquare: 'Onda Quadra', sigSine: 'Sinusoide', lblYss: 'Valore di Regime', lblEss: 'Errore a Regime', lblTr: 'Tempo di Salita', lblTs: 'Tempo di Assestamento', lblOvershoot: 'Sovraelongazione Max', inputLbl: 'Ingresso', outputLbl: 'Uscita',
+            nyquistTitle: 'Diagramma di Nyquist', lblP: 'Poli Instabili (P)', lblN: 'Avvolgimenti (N)', lblZ: 'Poli Instabili A.C. (Z)', lblDist: 'Distanza min. da (-1,0)',
+            nyquistZoomHint: 'Scorri per zoom, trascina per spostare', nyquistResetZoom: 'Reset Zoom'
         },
         en: {
             title: 'Welcome to <span class="font-bold"> Easy Bode </span>',
@@ -53,7 +109,10 @@
             real: 'Real', asymp: 'Asymp.', contrib: 'Contrib.',
             lp: 'Low-Pass', hp: 'High-Pass', bp: 'Band-Pass', ap: 'All-Pass', notch: 'Notch',
             absent: 'None', nd: 'N/A',
-            poleWord: 'Pole', zeroWord: 'Zero', ccWord: 'cc', originWord: 'origin'
+            poleWord: 'Pole', zeroWord: 'Zero', ccWord: 'cc', originWord: 'origin',
+            temporalTitle: 'Time Response Study', sigStep: 'Unit Step', sigImpulse: 'Impulse', sigRamp: 'Ramp', sigSquare: 'Square Wave', sigSine: 'Sine Wave', lblYss: 'Steady-State Value', lblEss: 'Steady-State Error', lblTr: 'Rise Time', lblTs: 'Settling Time', lblOvershoot: 'Max Overshoot', inputLbl: 'Input', outputLbl: 'Output',
+            nyquistTitle: 'Nyquist Diagram', lblP: 'Unstable Poles (P)', lblN: 'Encirclements (N)', lblZ: 'Unstable CL Poles (Z)', lblDist: 'Min. Distance from (-1,0)',
+            nyquistZoomHint: 'Scroll to zoom, drag to pan', nyquistResetZoom: 'Reset Zoom'
         },
         fr: {
             title: 'Bienvenue sur <span class="font-bold"> Easy Bode </span>',
@@ -72,7 +131,10 @@
             real: 'Réel', asymp: 'Asympt.', contrib: 'Contrib.',
             lp: 'Passe-Bas', hp: 'Passe-Haut', bp: 'Passe-Bande', ap: 'Passe-Tout', notch: 'Coupe-Bande',
             absent: 'Absent', nd: 'N/D',
-            poleWord: 'Pôle', zeroWord: 'Zéro', ccWord: 'c.c.', originWord: 'origine'
+            poleWord: 'Pôle', zeroWord: 'Zéro', ccWord: 'c.c.', originWord: 'origine',
+            temporalTitle: 'Étude de la Réponse Temporelle', sigStep: 'Échelon Unitaire', sigImpulse: 'Impulsion', sigRamp: 'Rampe', sigSquare: 'Onde Carrée', sigSine: 'Sinusoïde', lblYss: 'Valeur de Régime', lblEss: 'Erreur de Régime', lblTr: 'Temps de Montée', lblTs: 'Temps d\'Établissement', lblOvershoot: 'Dépassement Max', inputLbl: 'Entrée', outputLbl: 'Sortie',
+            nyquistTitle: 'Diagramme de Nyquist', lblP: 'Pôles Instables (P)', lblN: 'Encerclements (N)', lblZ: 'Pôles Instables B.F. (Z)', lblDist: 'Distance min. de (-1,0)',
+            nyquistZoomHint: 'Molette pour zoomer, glisser pour déplacer', nyquistResetZoom: 'Réinitialiser'
         },
         de: {
             title: 'Willkommen bei <span class="font-bold"> Easy Bode </span>',
@@ -91,7 +153,10 @@
             real: 'Real', asymp: 'Asympt.', contrib: 'Beitr.',
             lp: 'Tiefpass', hp: 'Hochpass', bp: 'Bandpass', ap: 'Allpass', notch: 'Bandsperre',
             absent: 'Keiner', nd: 'N/V',
-            poleWord: 'Pol', zeroWord: 'Nullstelle', ccWord: 'k.k.', originWord: 'Ursprung'
+            poleWord: 'Pol', zeroWord: 'Nullstelle', ccWord: 'k.k.', originWord: 'Ursprung',
+            temporalTitle: 'Zeitantwort-Analyse', sigStep: 'Einheitssprung', sigImpulse: 'Impuls', sigRamp: 'Rampe', sigSquare: 'Rechteckwelle', sigSine: 'Sinuswelle', lblYss: 'Beharrungswert', lblEss: 'Regelabweichung', lblTr: 'Anstiegszeit', lblTs: 'Einschwingzeit', lblOvershoot: 'Max. Überschwingen', inputLbl: 'Eingang', outputLbl: 'Ausgang',
+            nyquistTitle: 'Nyquist-Diagramm', lblP: 'Instabile Pole (P)', lblN: 'Umschlingungen (N)', lblZ: 'Instabile Pole g.K. (Z)', lblDist: 'Min. Abstand von (-1,0)',
+            nyquistZoomHint: 'Scrollen zum Zoomen, Ziehen zum Verschieben', nyquistResetZoom: 'Zoom zurücksetzen'
         },
         es: {
             title: 'Bienvenido a <span class="font-bold"> Easy Bode </span>',
@@ -110,7 +175,10 @@
             real: 'Real', asymp: 'Asint.', contrib: 'Contrib.',
             lp: 'Paso Bajo', hp: 'Paso Alto', bp: 'Paso Banda', ap: 'Paso Todo', notch: 'Rechazo Banda',
             absent: 'Ausente', nd: 'N/D',
-            poleWord: 'Polo', zeroWord: 'Cero', ccWord: 'c.c.', originWord: 'origen'
+            poleWord: 'Polo', zeroWord: 'Cero', ccWord: 'c.c.', originWord: 'origen',
+            temporalTitle: 'Estudio de la Respuesta Temporal', sigStep: 'Escalón Unitario', sigImpulse: 'Impulso', sigRamp: 'Rampa', sigSquare: 'Onda Cuadrada', sigSine: 'Onda Senoidal', lblYss: 'Valor de Régimen', lblEss: 'Error de Régimen', lblTr: 'Tiempo de Subida', lblTs: 'Tiempo de Establecimiento', lblOvershoot: 'Sobreoscilación Máx.', inputLbl: 'Entrada', outputLbl: 'Salida',
+            nyquistTitle: 'Diagrama de Nyquist', lblP: 'Polos Inestables (P)', lblN: 'Rodeos (N)', lblZ: 'Polos Inestables L.C. (Z)', lblDist: 'Distancia mín. a (-1,0)',
+            nyquistZoomHint: 'Desplaza para zoom, arrastra para mover', nyquistResetZoom: 'Restablecer Zoom'
         },
         zh: {
             title: '欢迎来到 <span class="font-bold"> Easy Bode </span>',
@@ -129,7 +197,10 @@
             real: '实际', asymp: '渐近线', contrib: '贡献',
             lp: '低通', hp: '高通', bp: '带通', ap: '全通', notch: '陷波',
             absent: '无', nd: '未知',
-            poleWord: '极点', zeroWord: '零点', ccWord: '共轭', originWord: '原点'
+            poleWord: '极点', zeroWord: '零点', ccWord: '共轭', originWord: '原点',
+            temporalTitle: '时间响应研究', sigStep: '单位阶跃', sigImpulse: '冲激', sigRamp: '斜坡', sigSquare: '方波', sigSine: '正弦波', lblYss: '稳态值', lblEss: '稳态误差', lblTr: '上升时间', lblTs: '调节时间', lblOvershoot: '最大超调量', inputLbl: '输入', outputLbl: '输出',
+            nyquistTitle: '奈奎斯特图', lblP: '不稳定极点 (P)', lblN: '环绕次数 (N)', lblZ: '闭环不稳定极点 (Z)', lblDist: '距(-1,0)最小距离',
+            nyquistZoomHint: '滚动缩放，拖动平移', nyquistResetZoom: '重置缩放'
         },
         pt: {
             title: 'Bem-vindo ao <span class="font-bold"> Easy Bode </span>',
@@ -148,7 +219,10 @@
             real: 'Real', asymp: 'Assint.', contrib: 'Contrib.',
             lp: 'Passa-Baixo', hp: 'Passa-Alto', bp: 'Passa-Banda', ap: 'Passa-Tudo', notch: 'Rejeição de Banda',
             absent: 'Ausente', nd: 'N/D',
-            poleWord: 'Polo', zeroWord: 'Zero', ccWord: 'c.c.', originWord: 'origem'
+            poleWord: 'Polo', zeroWord: 'Zero', ccWord: 'c.c.', originWord: 'origem',
+            temporalTitle: 'Estudo da Resposta Temporal', sigStep: 'Degrau Unitário', sigImpulse: 'Impulso', sigRamp: 'Rampa', sigSquare: 'Onda Quadrada', sigSine: 'Onda Senoidal', lblYss: 'Valor de Regime', lblEss: 'Erro de Regime', lblTr: 'Tempo de Subida', lblTs: 'Tempo de Acomodação', lblOvershoot: 'Sobressinal Máx.', inputLbl: 'Entrada', outputLbl: 'Saída',
+            nyquistTitle: 'Diagrama de Nyquist', lblP: 'Polos Instáveis (P)', lblN: 'Envolvimentos (N)', lblZ: 'Polos Instáveis M.F. (Z)', lblDist: 'Distância mín. de (-1,0)',
+            nyquistZoomHint: 'Role para zoom, arraste para mover', nyquistResetZoom: 'Redefinir Zoom'
         },
         ja: {
             title: '<span class="font-bold"> Easy Bode </span> へようこそ',
@@ -167,7 +241,10 @@
             real: '実際', asymp: '漸近線', contrib: '寄与',
             lp: '低域通過', hp: '高域通過', bp: '帯域通過', ap: 'オールパス', notch: 'ノッチ',
             absent: 'なし', nd: '不明',
-            poleWord: '極', zeroWord: '零点', ccWord: '共役', originWord: '原点'
+            poleWord: '極', zeroWord: '零点', ccWord: '共役', originWord: '原点',
+            temporalTitle: '時間応答の研究', sigStep: '単位ステップ', sigImpulse: 'インパルス', sigRamp: 'ランプ', sigSquare: '方形波', sigSine: '正弦波', lblYss: '定常値', lblEss: '定常偏差', lblTr: '立ち上がり時間', lblTs: '整定時間', lblOvershoot: '最大オーバーシュート', inputLbl: '入力', outputLbl: '出力',
+            nyquistTitle: 'ナイキスト線図', lblP: '不安定極 (P)', lblN: '周回数 (N)', lblZ: '閉ループ不安定極 (Z)', lblDist: '(-1,0)からの最小距離',
+            nyquistZoomHint: 'スクロールでズーム、ドラッグで移動', nyquistResetZoom: 'ズームをリセット'
         },
         ar: {
             title: 'مرحبًا بك في <span class="font-bold"> Easy Bode </span>',
@@ -186,7 +263,10 @@
             real: 'حقيقي', asymp: 'مقارب', contrib: 'المساهمات',
             lp: 'تمرير منخفض', hp: 'تمرير مرتفع', bp: 'تمرير نطاق', ap: 'تمرير كامل', notch: 'رفض نطاق',
             absent: 'غائب', nd: 'غير محدد',
-            poleWord: 'قطب', zeroWord: 'صفر', ccWord: 'مترافق', originWord: 'الأصل'
+            poleWord: 'قطب', zeroWord: 'صفر', ccWord: 'مترافق', originWord: 'الأصل',
+            temporalTitle: 'دراسة الاستجابة الزمنية', sigStep: 'خطوة الوحدة', sigImpulse: 'نبضة', sigRamp: 'منحدر', sigSquare: 'موجة مربعة', sigSine: 'موجة جيبية', lblYss: 'قيمة الاستقرار', lblEss: 'خطأ الاستقرار', lblTr: 'زمن الصعود', lblTs: 'زمن الاستقرار', lblOvershoot: 'أقصى تجاوز', inputLbl: 'الدخل', outputLbl: 'الخرج',
+            nyquistTitle: 'مخطط نايكويست', lblP: 'أقطاب غير مستقرة (P)', lblN: 'عدد الإحاطات (N)', lblZ: 'أقطاب حلقة مغلقة غير مستقرة (Z)', lblDist: 'أدنى مسافة من (-1,0)',
+            nyquistZoomHint: 'مرر للتكبير، اسحب للتحريك', nyquistResetZoom: 'إعادة ضبط التكبير'
         },
         hi: {
             title: '<span class="font-bold"> Easy Bode </span> में आपका स्वागत है',
@@ -205,7 +285,10 @@
             real: 'वास्तविक', asymp: 'स्पर्शोद्मुख', contrib: 'योगदान',
             lp: 'लो-पास', hp: 'हाई-पास', bp: 'बैंड-पास', ap: 'ऑल-पास', notch: 'नॉच',
             absent: 'अनुपस्थित', nd: 'अज्ञात',
-            poleWord: 'ध्रुव', zeroWord: 'शून्य', ccWord: 'संयुग्मी', originWord: 'मूल'
+            poleWord: 'ध्रुव', zeroWord: 'शून्य', ccWord: 'संयुग्मी', originWord: 'मूल',
+            temporalTitle: 'समय अनुक्रिया अध्ययन', sigStep: 'यूनिट स्टेप', sigImpulse: 'इम्पल्स', sigRamp: 'रैंप', sigSquare: 'स्क्वायर वेव', sigSine: 'साइन वेव', lblYss: 'स्थिर अवस्था मान', lblEss: 'स्थिर अवस्था त्रुटि', lblTr: 'राइज़ टाइम', lblTs: 'सेटलिंग टाइम', lblOvershoot: 'अधिकतम ओवरशूट', inputLbl: 'इनपुट', outputLbl: 'आउटपुट',
+            nyquistTitle: 'नाइक्विस्ट आरेख', lblP: 'अस्थिर ध्रुव (P)', lblN: 'परिक्रमाएँ (N)', lblZ: 'क्लोज्ड-लूप अस्थिर ध्रुव (Z)', lblDist: '(-1,0) से न्यूनतम दूरी',
+            nyquistZoomHint: 'ज़ूम के लिए स्क्रॉल करें, खिसकाने के लिए खींचें', nyquistResetZoom: 'ज़ूम रीसेट करें'
         }
 }
 
@@ -280,6 +363,24 @@
             document.getElementById('lbl-real').textContent = L.real;
             document.getElementById('lbl-asymp').textContent = L.asymp;
             document.getElementById('lbl-contrib').textContent = L.contrib;
+
+            document.getElementById('lbl-temporal-title').textContent = L.temporalTitle;
+            document.getElementById('lbl-overshoot').textContent = L.lblOvershoot;
+            document.getElementById('lbl-yss').textContent = L.lblYss;
+            document.getElementById('lbl-ess').textContent = L.lblEss;
+            document.getElementById('lbl-tr').textContent = L.lblTr;
+            document.getElementById('lbl-ts').textContent = L.lblTs;
+            buildSignalMenu();
+            updateSignalButtonDisplay();
+
+            document.getElementById('lbl-nyquist-title').textContent = L.nyquistTitle;
+            document.getElementById('lbl-nyquist-stability').textContent = L.clStab;
+            document.getElementById('lbl-nyquist-p').textContent = L.lblP;
+            document.getElementById('lbl-nyquist-n').textContent = L.lblN;
+            document.getElementById('lbl-nyquist-z').textContent = L.lblZ;
+            document.getElementById('lbl-nyquist-dist').textContent = L.lblDist;
+            document.getElementById('lbl-nyquist-zoom-hint').textContent = L.nyquistZoomHint;
+            document.getElementById('lbl-nyquist-reset').textContent = L.nyquistResetZoom;
         }
         
 
@@ -787,9 +888,11 @@
                 pmValue = 180 + phAtWc;
                 document.getElementById('val-pm').innerText = pmValue.toFixed(1) + '°';
                 document.getElementById('val-wc').innerText = (currentUnit === 'Hz' ? wAtWc / (2 * Math.PI) : wAtWc).toPrecision(3) + ' ' + unitLabel;
+                lastWc = wAtWc; // rad/s, used as the default sine input frequency in the temporal response study
             } else {
                 document.getElementById('val-pm').innerText = '∞°';
                 document.getElementById('val-wc').innerText = '--';
+                lastWc = null;
             }
 
             let w180Cross = findCrossing(freqRad, phaseData, -180);
@@ -838,6 +941,520 @@
             else if (magLow < magHigh - 3) behavior = t('hp');
             else behavior = t('ap');
             document.getElementById('val-filter-behavior').innerText = behavior;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STUDIO DELLA RISPOSTA TEMPORALE — state-space simulation engine
+        // ═══════════════════════════════════════════════════════════════════
+
+        // Builds the controllable-canonical state-space matrices (A, B, C, D)
+        // from a transfer function's ascending numerator/denominator
+        // coefficients. For an order-0 system (pure gain, no dynamics) there
+        // is no state: the output just tracks D*u(t) instantaneously.
+        function buildStateSpace(numC, denC) {
+            const n = denC.length - 1;
+            if (n <= 0) {
+                const D = denC[0] ? (numC[0] || 0) / denC[0] : 0;
+                return { A: [], B: [], C: [], D, n: 0 };
+            }
+            const an = denC[n];
+            const a = denC.map(v => v / an);           // normalize denominator to monic
+            const b = new Array(n + 1).fill(0);
+            for (let i = 0; i < numC.length && i <= n; i++) b[i] = numC[i] / an;
+            const D = b[n];                              // feed-through term (numerator reaches full degree n)
+            const C = new Array(n);
+            for (let i = 0; i < n; i++) C[i] = b[i] - D * a[i];
+            const A = [];
+            for (let i = 0; i < n; i++) {
+                const row = new Array(n).fill(0);
+                if (i < n - 1) row[i + 1] = 1;
+                else for (let j = 0; j < n; j++) row[j] = -a[j];
+                A.push(row);
+            }
+            const B = new Array(n).fill(0);
+            B[n - 1] = 1;
+            return { A, B, C, D, n };
+        }
+
+        // Dynamic simulation horizon: ~5 time constants of the slowest stable
+        // pole (the one closest to the imaginary axis), or a 10s default when
+        // the system is unstable or has only origin poles (no finite decay
+        // rate to time the simulation against).
+        function computeTmax(poles, gPole) {
+            const stableAbsParts = (poles || []).map(p => toReal(p)).filter(re => re < -1e-6).map(re => Math.abs(re));
+            if (gPole > 0 || stableAbsParts.length === 0) return 10;
+            const sigmaMin = Math.min(...stableAbsParts);
+            let T = 5 / sigmaMin;
+            if (!isFinite(T) || T <= 0) return 10;
+            return Math.min(Math.max(T, 0.01), 500);
+        }
+
+        // Value of the chosen input signal at a given time (the impulse is
+        // handled separately, via an initial state jump — see simulateTimeResponse).
+        function inputSignalValue(type, time, Tmax, wc) {
+            switch (type) {
+                case 'ramp': return time;
+                case 'square': {
+                    const halfPeriod = Tmax / 4; // period = Tmax/2
+                    return (Math.floor(time / halfPeriod) % 2 === 0) ? 1 : -1;
+                }
+                case 'sine': return Math.sin((wc || 1) * time);
+                default: return 1; // step
+            }
+        }
+
+        // n x n matrix times an n-vector.
+        function matVecMul(A, x) { return A.map(row => row.reduce((s, aij, j) => s + aij * x[j], 0)); }
+
+        // Simulates the state-space system's response to the chosen input
+        // using 4th-order Runge-Kutta integration over 500 fixed steps.
+        // The unit impulse is simulated exactly via the classic trick of an
+        // initial state jump x(0)=B with zero input afterwards, rather than
+        // approximating δ(t) with a narrow pulse (whose plotted amplitude
+        // would otherwise depend arbitrarily on the integration step size).
+        function simulateTimeResponse(ss, signalType, Tmax, wc) {
+            const N = 500, dt = Tmax / N;
+            const tArr = [], uArr = [], yArr = [];
+            const isImpulse = signalType === 'impulse';
+
+            if (ss.n === 0) {
+                for (let k = 0; k <= N; k++) {
+                    const time = k * dt;
+                    const u = isImpulse ? (k === 0 ? 1 : 0) : inputSignalValue(signalType, time, Tmax, wc);
+                    tArr.push(time); uArr.push(u);
+                    yArr.push(isImpulse ? (k === 0 ? ss.D : 0) : ss.D * u);
+                }
+                return { t: tArr, u: uArr, y: yArr };
+            }
+
+            const { A, B, C, D, n } = ss;
+            let x = isImpulse ? B.slice() : new Array(n).fill(0);
+            const uAt = (time) => isImpulse ? 0 : inputSignalValue(signalType, time, Tmax, wc);
+            const f = (xVec, uVal) => matVecMul(A, xVec).map((v, i) => v + B[i] * uVal);
+
+            for (let k = 0; k <= N; k++) {
+                const time = k * dt;
+                tArr.push(time);
+                uArr.push(isImpulse ? (k === 0 ? 1 : 0) : uAt(time));
+                yArr.push(x.reduce((s, xi, i) => s + C[i] * xi, 0) + D * uAt(time));
+
+                if (k === N) break;
+                const u1 = uAt(time), u2 = uAt(time + dt / 2), u4 = uAt(time + dt);
+                const k1 = f(x, u1);
+                const k2 = f(x.map((xi, i) => xi + dt / 2 * k1[i]), u2);
+                const k3 = f(x.map((xi, i) => xi + dt / 2 * k2[i]), u2);
+                const k4 = f(x.map((xi, i) => xi + dt * k3[i]), u4);
+                x = x.map((xi, i) => xi + (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+            }
+            return { t: tArr, u: uArr, y: yArr };
+        }
+
+        // Performance indicators are always computed from the STEP response,
+        // independent of whichever signal is currently shown on the chart —
+        // rise time, overshoot, settling time and steady-state error are
+        // classic step-response metrics and describe the system itself, not
+        // a property of the selected input.
+        function computeStepKPIs(t, y, isConvergent) {
+            if (!isConvergent) return { yss: null, tr: null, ts: null, overshoot: null, ess: null };
+
+            const yss = y[y.length - 1];
+            const ess = 1 - yss;
+
+            let t10 = null, t90 = null;
+            const target10 = 0.1 * yss, target90 = 0.9 * yss;
+            for (let i = 0; i < y.length; i++) {
+                const reached10 = yss >= 0 ? y[i] >= target10 : y[i] <= target10;
+                const reached90 = yss >= 0 ? y[i] >= target90 : y[i] <= target90;
+                if (t10 === null && reached10) t10 = t[i];
+                if (t90 === null && reached90) { t90 = t[i]; break; }
+            }
+            const tr = (t10 !== null && t90 !== null) ? (t90 - t10) : null;
+
+            let overshoot = 0;
+            if (Math.abs(yss) > 1e-9) {
+                const extreme = yss >= 0 ? Math.max(...y) : Math.min(...y);
+                overshoot = Math.max(0, (Math.abs(extreme) - Math.abs(yss)) / Math.abs(yss) * 100);
+            }
+
+            const band = Math.max(Math.abs(yss) * 0.02, 1e-6);
+            let lastOutside = -1;
+            for (let i = y.length - 1; i >= 0; i--) {
+                if (Math.abs(y[i] - yss) > band) { lastOutside = i; break; }
+            }
+            const ts = lastOutside === -1 ? 0 : t[Math.min(lastOutside + 1, t.length - 1)];
+
+            return { yss, tr, ts, overshoot, ess };
+        }
+
+        // Formats a time value in seconds, switching to milliseconds for very
+        // short durations so short-lived (high-frequency) systems stay readable.
+        function formatTime(v) {
+            if (v === null || v === undefined) return t('nd');
+            return v < 0.001 ? (v * 1000).toFixed(2) + ' ms' : v.toFixed(3) + ' s';
+        }
+
+        // Runs the full temporal-response pipeline for the current transfer
+        // function: builds the state-space model, simulates the selected
+        // input signal for the chart, always simulates the step response
+        // separately for the KPIs, then updates the DOM and the chart.
+        function calculateTemporalResponse(analysis) {
+            const ss = buildStateSpace(analysis.numC, analysis.denC);
+            const Tmax = computeTmax(analysis.poles, analysis.gPole);
+            const wc = lastWc || 1;
+            const isConvergent = analysis.gPole === 0 && analysis.poles.every(p => toReal(p) < -1e-6);
+
+            const sim = simulateTimeResponse(ss, currentSignal, Tmax, wc);
+            const stepSim = currentSignal === 'step' ? sim : simulateTimeResponse(ss, 'step', Tmax, wc);
+            const kpis = computeStepKPIs(stepSim.t, stepSim.y, isConvergent);
+
+            lastTemporalData = { t: sim.t, u: sim.u, y: sim.y, kpis, signal: currentSignal };
+
+            document.getElementById('val-yss').textContent = kpis.yss === null ? t('nd') : kpis.yss.toFixed(3);
+            document.getElementById('val-ess').textContent = kpis.ess === null ? t('nd') : kpis.ess.toFixed(3);
+            document.getElementById('val-tr').textContent = formatTime(kpis.tr);
+            document.getElementById('val-ts').textContent = formatTime(kpis.ts);
+            document.getElementById('val-overshoot').textContent = kpis.overshoot === null ? t('nd') : kpis.overshoot.toFixed(1) + '%';
+
+            renderTemporalChart(sim.t, sim.u, sim.y);
+        }
+
+        // Draws (or redraws) the temporal response chart: a dashed neutral
+        // line for the input signal and a solid indigo/violet line for the
+        // system's output — the same palette in both light and dark mode.
+        // The Input/Output legend is a custom HTML pill pair (see
+        // toggleTemporalDataset), not Chart.js's built-in canvas legend, so
+        // it can match the site's rounded-full button styling.
+        function renderTemporalChart(tArr, uArr, yArr) {
+            const canvas = document.getElementById('temporalChart');
+            if (!canvas) return;
+
+            const gridColor = isDarkMode ? '#2a3441' : '#e5e7eb';
+            const textColor = isDarkMode ? '#9aa7b8' : '#6b7280';
+            const outputColor = isDarkMode ? '#818cf8' : '#6366f1';
+            const inputColor = isDarkMode ? '#6b7280' : '#9ca3af';
+
+            // Sync the custom legend pills' colors and default (visible) state.
+            const outBtn = document.getElementById('legend-btn-output');
+            const inBtn = document.getElementById('legend-btn-input');
+            const outDot = document.getElementById('legend-dot-output');
+            const inDot = document.getElementById('legend-dot-input');
+            if (outBtn) { outBtn.style.setProperty('--legend-color', outputColor); outBtn.classList.add('active'); outBtn.classList.remove('inactive'); }
+            if (inBtn) { inBtn.style.setProperty('--legend-color', inputColor); inBtn.classList.add('active'); inBtn.classList.remove('inactive'); }
+            if (outDot) outDot.style.backgroundColor = outputColor;
+            if (inDot) inDot.style.backgroundColor = inputColor;
+            const outLabel = document.getElementById('legend-label-output'); if (outLabel) outLabel.textContent = t('outputLbl');
+            const inLabel = document.getElementById('legend-label-input'); if (inLabel) inLabel.textContent = t('inputLbl');
+
+            if (temporalChart) temporalChart.destroy();
+            temporalChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: tArr.map(v => v.toFixed(3)),
+                    datasets: [
+                        { label: t('outputLbl'), data: yArr, borderColor: outputColor, borderWidth: 2.5, tension: 0.15, pointRadius: 0 },
+                        { label: t('inputLbl'), data: uArr, borderColor: inputColor, borderDash: [5, 5], borderWidth: 1.5, tension: 0, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    scales: {
+                        x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 8, font: { size: 11 } }, title: { display: true, text: 't (s)', color: textColor, font: { size: 12, weight: '600' } } },
+                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        zoom: {
+                            pan: { enabled: true, mode: 'xy' },
+                            zoom: { wheel: { enabled: false }, pinch: { enabled: true }, mode: 'xy' } // wheel requires a click first — see activateChartZoom()
+                        }
+                    }
+                }
+            });
+            makeChartClickActivatable(temporalChart, canvas);
+        }
+
+        // Toggles one dataset (0 = output, 1 = input) on/off, mirroring the
+        // visual style of Chart.js's own clickable legend but as real,
+        // fully-rounded pill buttons matching the site's design.
+        function toggleTemporalDataset(index) {
+            if (!temporalChart) return;
+            const meta = temporalChart.getDatasetMeta(index);
+            meta.hidden = meta.hidden === null ? !temporalChart.data.datasets[index].hidden : !meta.hidden;
+            temporalChart.update();
+            const btn = document.getElementById(index === 0 ? 'legend-btn-output' : 'legend-btn-input');
+            if (btn) btn.classList.toggle('inactive', !!meta.hidden);
+        }
+
+        // ── Custom signal dropdown (name + mini waveform SVG + formula) ─────
+        const SIGNAL_ORDER = ['step', 'impulse', 'ramp', 'square', 'sine'];
+        const SIGNAL_META = {
+            step:    { nameKey: 'sigStep',    formula: 'u(t) = 1(t)',
+                svg: '<svg viewBox="0 0 60 24" class="w-10 h-6"><path d="M2 20 H22 V4 H58" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
+            impulse: { nameKey: 'sigImpulse', formula: 'u(t) = δ(t)',
+                svg: '<svg viewBox="0 0 60 24" class="w-10 h-6"><path d="M2 20 H26 L30 3 L34 20 H58" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
+            ramp:    { nameKey: 'sigRamp',    formula: 'u(t) = t',
+                svg: '<svg viewBox="0 0 60 24" class="w-10 h-6"><path d="M2 22 L58 2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' },
+            square:  { nameKey: 'sigSquare',  formula: 'u(t) = sgn(sin ωt)',
+                svg: '<svg viewBox="0 0 60 24" class="w-10 h-6"><path d="M2 5 H16 V19 H30 V5 H44 V19 H58" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
+            sine:    { nameKey: 'sigSine',    formula: 'u(t) = sin(ωc·t)',
+                svg: '<svg viewBox="0 0 60 24" class="w-10 h-6"><path d="M2 12 C10 2 16 2 20 12 C24 22 30 22 34 12 C38 2 44 2 48 12 C52 20 55 20 58 14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>' }
+        };
+
+        // Builds the dropdown's option list from SIGNAL_META (avoids
+        // duplicating the waveform SVGs between the button and the menu).
+        function buildSignalMenu() {
+            const menu = document.getElementById('signal-menu');
+            if (!menu) return;
+            menu.innerHTML = SIGNAL_ORDER.map(key => {
+                const m = SIGNAL_META[key];
+                return `<button type="button" onclick="selectSignal('${key}')" class="signal-option w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-stone-100 dark:hover:bg-gray-700 cursor-pointer">
+                    <span class="w-10 h-6 flex items-center justify-center text-stone-500 dark:text-gray-400 shrink-0">${m.svg}</span>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-bold text-stone-800 dark:text-darktext">${t(m.nameKey)}</span>
+                        <span class="block text-[11px] text-stone-500 dark:text-gray-400 font-mono">${m.formula}</span>
+                    </span>
+                </button>`;
+            }).join('');
+        }
+
+        // Refreshes the dropdown button's icon/name/formula to match currentSignal.
+        function updateSignalButtonDisplay() {
+            const m = SIGNAL_META[currentSignal];
+            const icon = document.getElementById('signal-btn-icon');
+            const name = document.getElementById('signal-btn-name');
+            const formula = document.getElementById('signal-btn-formula');
+            if (icon) icon.innerHTML = m.svg;
+            if (name) name.textContent = t(m.nameKey);
+            if (formula) formula.textContent = m.formula;
+        }
+
+        // Shows/hides the signal dropdown panel.
+        function toggleSignalMenu() { document.getElementById('signal-menu').classList.toggle('open'); }
+
+        // Selects a new input signal, refreshes the button display, and
+        // re-simulates immediately if a transfer function is already shown.
+        function selectSignal(type) {
+            currentSignal = type;
+            document.getElementById('signal-menu').classList.remove('open');
+            updateSignalButtonDisplay();
+            if (isInterfaceExpanded && lastFreqDisplay.length) {
+                let analysis = null;
+                try { analysis = computeTFAnalysis(document.getElementById('tfInput').value); } catch(e) {}
+                if (analysis) calculateTemporalResponse(analysis);
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('signal-dropdown-container');
+            if (container && !container.contains(e.target)) {
+                const menu = document.getElementById('signal-menu');
+                if (menu) menu.classList.remove('open');
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════════
+        // DIAGRAMMA DI NYQUIST
+        // ═══════════════════════════════════════════════════════════════════
+
+        // Winding number of a closed polyline around the point (cx, cy):
+        // sums the signed angle swept at each step and divides by 2π. This
+        // is the standard, robust way to count encirclements numerically
+        // (no special-casing needed for how many times the curve crosses
+        // any particular ray from the point).
+        function windingNumberAround(pts, cx, cy) {
+            let total = 0;
+            for (let i = 0; i < pts.length - 1; i++) {
+                const a1 = Math.atan2(pts[i].y - cy, pts[i].x - cx);
+                const a2 = Math.atan2(pts[i + 1].y - cy, pts[i + 1].x - cx);
+                let d = a2 - a1;
+                while (d > Math.PI) d -= 2 * Math.PI;
+                while (d < -Math.PI) d += 2 * Math.PI;
+                total += d;
+            }
+            return total / (2 * Math.PI);
+        }
+
+        // Builds the Nyquist contour and its stability indicators from the
+        // already-computed Bode sweep (reuses lastFreqRad/lastMagData/
+        // lastPhaseData — no need to re-evaluate the transfer function).
+        // The contour follows the standard convention (ω sweeping from -∞
+        // to +∞): the mirrored branch (ω<0, the complex conjugate) is drawn
+        // first, then the positive branch, so the two connect into one
+        // continuous curve for the winding-number calculation.
+        // Evaluates a polynomial (ascending coefficients) at a complex point
+        // via Horner's method.
+        function evalPolyAt(coeffsAsc, s) {
+            let result = math.complex(0, 0);
+            for (let i = coeffsAsc.length - 1; i >= 0; i--) {
+                result = math.add(math.multiply(result, s), math.complex(coeffsAsc[i], 0));
+            }
+            return result;
+        }
+        function evalTFAt(numC, denC, s) { return math.divide(evalPolyAt(numC, s), evalPolyAt(denC, s)); }
+
+        // When G(s) has a pole at the origin, the Nyquist contour must
+        // indent around it with a small semicircle (radius ε) bulging into
+        // the right half-plane. Rather than approximating this with a
+        // straight line or a hand-derived sweep formula — both were tested
+        // and found to give the wrong encirclement count for double (or
+        // higher) origin poles — this evaluates the *real* transfer
+        // function directly on that semicircle, which is correct by
+        // construction for any pole multiplicity.
+        function buildOriginIndentation(numC, denC, poles, zeros) {
+            const finiteMags = poles.concat(zeros).map(p => cMag(p)).filter(m => m > 1e-9);
+            const eps = finiteMags.length ? Math.min(1e-4, Math.min(...finiteMags) * 1e-4) : 1e-6;
+            const steps = 200;
+            const pts = [];
+            for (let k = 0; k <= steps; k++) {
+                const theta = -Math.PI / 2 + Math.PI * (k / steps);
+                const s = math.complex(eps * Math.cos(theta), eps * Math.sin(theta));
+                const g = evalTFAt(numC, denC, s);
+                pts.push({ x: g.re, y: g.im });
+            }
+            return pts;
+        }
+
+        function calculateNyquist(analysis) {
+            // Nyquist gets its own frequency sweep, scaled to the system's
+            // actual pole/zero magnitudes. The fixed global Bode sweep
+            // (1e-2 to 1e9 rad/s) doesn't adapt to extreme cases — for a
+            // pole at, say, -1e-8, the interesting near-DC transition
+            // happens around 1e-8 rad/s, far below that fixed sweep's
+            // minimum, so the true curve shape was never even sampled.
+            const charMags = analysis.poles.concat(analysis.zeros).map(p => cMag(p)).filter(m => m > 1e-12);
+            const wLow = charMags.length ? Math.min(...charMags) * 1e-3 : 1e-3;
+            const wHigh = charMags.length ? Math.max(...charMags) * 1e3 : 1e3;
+            const decStart = Math.floor(Math.log10(wLow)), decEnd = Math.ceil(Math.log10(wHigh));
+            const sweep = [];
+            for (let dec = decStart; dec <= decEnd; dec += 0.02) sweep.push(Math.pow(10, dec));
+
+            const posBranch = [], negBranch = [];
+            sweep.forEach(w => {
+                const g = evalTFAt(analysis.numC, analysis.denC, math.complex(0, w));
+                posBranch.push({ x: g.re, y: g.im });
+                negBranch.push({ x: g.re, y: -g.im }); // conjugate, for ω<0
+            });
+
+            // Full closed contour: ω from -∞ (reversed negative branch) to
+            // +∞, indenting around the origin in between when needed.
+            const revNeg = negBranch.slice().reverse();
+            const fullContour = analysis.gPole > 0
+                ? revNeg.concat(buildOriginIndentation(analysis.numC, analysis.denC, analysis.poles, analysis.zeros)).concat(posBranch)
+                : revNeg.concat(posBranch);
+
+            const P = analysis.poles.filter(p => toReal(p) > 1e-6).length; // open-loop poles in the right half-plane
+            // windingNumberAround returns the mathematical (counterclockwise-
+            // positive) winding number; the classical Nyquist criterion's N
+            // counts *clockwise* encirclements, hence the sign flip.
+            const N = -Math.round(windingNumberAround(fullContour, -1, 0));
+            const Z = N + P;
+            const stable = closedLoopStability(analysis); // exact verdict (characteristic-polynomial roots), shown as the definitive badge
+
+            let minDist = Infinity;
+            fullContour.forEach(pt => { minDist = Math.min(minDist, Math.hypot(pt.x + 1, pt.y)); });
+
+            const fullBounds = computeNyquistBounds(posBranch, negBranch);
+            const initBounds = computeNyquistInitialView(posBranch);
+            lastNyquistData = { posBranch, negBranch, P, N, Z, minDist, stable, fullBounds, initBounds };
+
+            document.getElementById('val-nyquist-p').textContent = P;
+            document.getElementById('val-nyquist-n').textContent = N;
+            document.getElementById('val-nyquist-z').textContent = Z;
+            document.getElementById('val-nyquist-dist').textContent = isFinite(minDist) ? minDist.toPrecision(3) : t('nd');
+
+            const stEl = document.getElementById('val-nyquist-stability');
+            stEl.textContent = stable ? t('stable') : t('unstable');
+            stEl.className = 'text-sm font-bold uppercase tracking-wide px-2.5 py-1 rounded-md inline-block mt-1 ' + (stable
+                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400'
+                : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400');
+
+            renderNyquistChart(posBranch, negBranch, initBounds, fullBounds);
+        }
+
+        // The full data-driven bounding box (every plotted point + 12%
+        // margin) — used only as the outer pan/zoom limit, so the complete
+        // curve is always reachable by zooming out, exactly like MATLAB's
+        // nyquist(). No longer forces the critical point into the frame:
+        // that was harmless for huge curves but unnecessary, and this box
+        // is not what's shown by default (see computeNyquistInitialView).
+        function computeNyquistBounds(posBranch, negBranch) {
+            let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+            posBranch.concat(negBranch).forEach(p => {
+                if (!isFinite(p.x) || !isFinite(p.y)) return;
+                if (p.x < xMin) xMin = p.x;
+                if (p.x > xMax) xMax = p.x;
+                if (p.y < yMin) yMin = p.y;
+                if (p.y > yMax) yMax = p.y;
+            });
+            if (!isFinite(xMin) || !isFinite(xMax)) { xMin = -3; xMax = 3; }
+            if (!isFinite(yMin) || !isFinite(yMax)) { yMin = -3; yMax = 3; }
+            const marginX = Math.max((xMax - xMin) * 0.12, 0.5);
+            const marginY = Math.max((yMax - yMin) * 0.12, 0.5);
+            return { xMin: xMin - marginX, xMax: xMax + marginX, yMin: yMin - marginY, yMax: yMax + marginY };
+        }
+
+        // The default view shown when the diagram is first drawn: based on
+        // the MEDIAN magnitude of the curve rather than its full extent, so
+        // it stays immediately legible even when a very small (or very
+        // large) pole/zero makes the full curve span many orders of
+        // magnitude — without this, systems like that required a lot of
+        // manual zooming just to see anything.
+        function computeNyquistInitialView(posBranch) {
+            const mags = posBranch.map(p => Math.hypot(p.x, p.y)).filter(m => isFinite(m)).sort((a, b) => a - b);
+            const bound = mags.length ? Math.min(Math.max(mags[Math.floor(mags.length * 0.5)] * 3, 4), 20) : 5;
+            return { xMin: -bound, xMax: bound, yMin: -bound, yMax: bound };
+        }
+
+        // Draws (or redraws) the Nyquist chart: solid curve for ω>0, a
+        // lighter dashed mirror for ω<0, and a marked critical point (-1,0).
+        // Opens on the compact `initBounds` view; zooming out is limited to
+        // `fullBounds` (the complete curve), never further.
+        function renderNyquistChart(posBranch, negBranch, initBounds, fullBounds) {
+            const canvas = document.getElementById('nyquistChart');
+            if (!canvas) return;
+            const gridColor = isDarkMode ? '#2a3441' : '#e5e7eb';
+            const textColor = isDarkMode ? '#9aa7b8' : '#6b7280';
+            const curveColor = isDarkMode ? '#818cf8' : '#6366f1';
+            const mirrorColor = isDarkMode ? '#6b7280' : '#9ca3af';
+            const criticalColor = isDarkMode ? '#f87171' : '#dc2626';
+
+            if (nyquistChart) nyquistChart.destroy();
+            nyquistChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        { label: 'ω > 0', data: posBranch, borderColor: curveColor, borderWidth: 2.5, pointRadius: 0, showLine: true, tension: 0 },
+                        { label: 'ω < 0', data: negBranch, borderColor: mirrorColor, borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, showLine: true, tension: 0 },
+                        { label: '-1 + j0', data: [{ x: -1, y: 0 }], borderColor: criticalColor, backgroundColor: criticalColor, pointRadius: 6, pointStyle: 'crossRot', pointBorderWidth: 3, showLine: false }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { intersect: false },
+                    scales: {
+                        x: { type: 'linear', min: initBounds.xMin, max: initBounds.xMax, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, title: { display: true, text: 'Re', color: textColor, font: { size: 12, weight: '600' } } },
+                        y: { type: 'linear', min: initBounds.yMin, max: initBounds.yMax, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, title: { display: true, text: 'Im', color: textColor, font: { size: 12, weight: '600' } } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        zoom: {
+                            limits: { x: { min: fullBounds.xMin, max: fullBounds.xMax }, y: { min: fullBounds.yMin, max: fullBounds.yMax } },
+                            pan: { enabled: true, mode: 'xy' },
+                            zoom: {
+                                wheel: { enabled: false }, // requires a click on the chart first — see activateChartZoom()
+                                pinch: { enabled: true }, mode: 'xy'
+                            }
+                        }
+                    }
+                }
+            });
+            makeChartClickActivatable(nyquistChart, canvas);
+        }
+
+        // Restores the Nyquist chart to its initial suggested view.
+        function resetNyquistZoom() {
+            if (nyquistChart && typeof nyquistChart.resetZoom === 'function') nyquistChart.resetZoom();
         }
 
         // ── X-axis tick formatter: only powers of 10, shown as 10ⁿ ──────────
@@ -914,15 +1531,19 @@
                 asympMagData = buildAsymptoticCurve(poleGroups, zeroGroups, analysis.gPole, analysis.gZero, freqRad, startLevel);
                 asympPhaseData = buildAsymptoticPhase(poleGroups, zeroGroups, analysis.gPole, analysis.gZero, freqRad);
                 contributionCurves = buildContributionCurves(analysis, freqRad);
+
+                lastFreqDisplay = freqDisplay;
+                lastFreqRad = freqRad;
+                lastMagData = magData;
+                lastPhaseData = phaseData;
+                lastAsympMagData = asympMagData;
+                lastAsympPhaseData = asympPhaseData;
+
                 updateParameterPanel(analysis, freqRad, freqDisplay, magData, phaseData);
+                try { calculateTemporalResponse(analysis); } catch(e) { console.error('Temporal response error:', e); }
+                try { calculateNyquist(analysis); } catch(e) { console.error('Nyquist error:', e); }
             }
 
-            lastFreqDisplay = freqDisplay;
-            lastFreqRad = freqRad;
-            lastMagData = magData;
-            lastPhaseData = phaseData;
-            lastAsympMagData = asympMagData;
-            lastAsympPhaseData = asympPhaseData;
             lastContributionCurves = contributionCurves;
 
             renderContributionsMenu(contributionCurves);
@@ -962,8 +1583,10 @@
 
         // Draws (or redraws) the magnitude and phase Chart.js charts with the current data, colors and axis settings.
         function renderCharts(labels, magData, phaseData, asympMagData, asympPhaseData, contributionCurves) {
-            const magCtx = document.getElementById('magnitudeChart').getContext('2d');
-            const phaseCtx = document.getElementById('phaseChart').getContext('2d');
+            const magCanvas = document.getElementById('magnitudeChart');
+            const phaseCanvas = document.getElementById('phaseChart');
+            const magCtx = magCanvas.getContext('2d');
+            const phaseCtx = phaseCanvas.getContext('2d');
 
             let gridColor = isDarkMode ? '#2a3441' : '#e5e7eb';
             let textColor = isDarkMode ? '#9aa7b8' : '#6b7280';
@@ -992,15 +1615,23 @@
                             title: { display: true, text: yLabel, color: textColor, font: { size: axisTitleFontSize, weight: '600' } }
                         }
                     },
-                    plugins: { legend: { display: false } }
+                    plugins: {
+                        legend: { display: false },
+                        zoom: {
+                            pan: { enabled: true, mode: 'xy' },
+                            zoom: { wheel: { enabled: false }, pinch: { enabled: true }, mode: 'xy' } // wheel requires a click first — see activateChartZoom()
+                        }
+                    }
                 };
             }
 
             if (magChart) magChart.destroy();
             magChart = new Chart(magCtx, { type: 'line', data: { labels, datasets: datasetsMag }, options: makeChartOptions('dB') });
+            makeChartClickActivatable(magChart, magCanvas);
 
             if (phaseChart) phaseChart.destroy();
             phaseChart = new Chart(phaseCtx, { type: 'line', data: { labels, datasets: datasetsPhase }, options: makeChartOptions('°') });
+            makeChartClickActivatable(phaseChart, phaseCanvas);
         }
 
         let resizeRedrawTimeout;
@@ -1067,6 +1698,114 @@
             return { img, w: FW, h: FH };
         }
 
+        // Renders the temporal response chart off-screen at a fixed size/font
+        // for the PDF, exactly like renderExportChart does for the Bode plots.
+        function renderExportTemporalChart() {
+            if (!lastTemporalData) return null;
+            const { t: tArr, u, y } = lastTemporalData;
+            const FW = 1600, FH = 720;
+            const off = document.createElement('canvas');
+            off.width = FW; off.height = FH;
+            off.style.position = 'fixed'; off.style.left = '-99999px';
+            document.body.appendChild(off);
+
+            const gridColor = isDarkMode ? '#2a3441' : '#e5e7eb';
+            const textColor = isDarkMode ? '#9aa7b8' : '#6b7280';
+            const bgColor = isDarkMode ? '#0b0f17' : '#fdfbf7';
+            const outputColor = isDarkMode ? '#818cf8' : '#6366f1';
+            const inputColor = isDarkMode ? '#6b7280' : '#9ca3af';
+
+            const chart = new Chart(off.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: tArr.map(v => v.toFixed(3)),
+                    datasets: [
+                        { label: t('outputLbl'), data: y, borderColor: outputColor, borderWidth: 3, tension: 0.15, pointRadius: 0 },
+                        { label: t('inputLbl'), data: u, borderColor: inputColor, borderDash: [10, 10], borderWidth: 2, tension: 0, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    devicePixelRatio: 1,
+                    responsive: false, maintainAspectRatio: false, animation: false,
+                    layout: { padding: { left: 10, right: 20, top: 12, bottom: 10 } },
+                    scales: {
+                        x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 10, font: { size: 16 } }, title: { display: true, text: 't (s)', color: textColor, font: { size: 18, weight: '600' } } },
+                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 16 } } }
+                    },
+                    plugins: { legend: { display: true, position: 'top', align: 'end', labels: { color: textColor, boxWidth: 24, font: { size: 16 } } } }
+                },
+                plugins: [{
+                    id: 'solidBg',
+                    beforeDraw(c) {
+                        const { ctx, width, height } = c;
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'destination-over';
+                        ctx.fillStyle = bgColor;
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.restore();
+                    }
+                }]
+            });
+            const img = chart.toBase64Image('image/jpeg', 0.92);
+            chart.destroy();
+            document.body.removeChild(off);
+            return { img, w: FW, h: FH };
+        }
+
+        // Renders the Nyquist chart off-screen at a fixed size/font for the PDF.
+        function renderExportNyquistChart() {
+            if (!lastNyquistData) return null;
+            const { posBranch, negBranch, fullBounds: bounds } = lastNyquistData;
+            const FW = 1600, FH = 900;
+            const off = document.createElement('canvas');
+            off.width = FW; off.height = FH;
+            off.style.position = 'fixed'; off.style.left = '-99999px';
+            document.body.appendChild(off);
+
+            const gridColor = isDarkMode ? '#2a3441' : '#e5e7eb';
+            const textColor = isDarkMode ? '#9aa7b8' : '#6b7280';
+            const bgColor = isDarkMode ? '#0b0f17' : '#fdfbf7';
+            const curveColor = isDarkMode ? '#818cf8' : '#6366f1';
+            const mirrorColor = isDarkMode ? '#6b7280' : '#9ca3af';
+            const criticalColor = isDarkMode ? '#f87171' : '#dc2626';
+
+            const chart = new Chart(off.getContext('2d'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        { data: posBranch, borderColor: curveColor, borderWidth: 3, pointRadius: 0, showLine: true, tension: 0 },
+                        { data: negBranch, borderColor: mirrorColor, borderDash: [10, 10], borderWidth: 2, pointRadius: 0, showLine: true, tension: 0 },
+                        { data: [{ x: -1, y: 0 }], borderColor: criticalColor, backgroundColor: criticalColor, pointRadius: 9, pointStyle: 'crossRot', pointBorderWidth: 4, showLine: false }
+                    ]
+                },
+                options: {
+                    devicePixelRatio: 1,
+                    responsive: false, maintainAspectRatio: false, animation: false,
+                    layout: { padding: { left: 10, right: 20, top: 12, bottom: 10 } },
+                    scales: {
+                        x: { type: 'linear', min: bounds.xMin, max: bounds.xMax, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 16 } }, title: { display: true, text: 'Re', color: textColor, font: { size: 18, weight: '600' } } },
+                        y: { type: 'linear', min: bounds.yMin, max: bounds.yMax, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 16 } }, title: { display: true, text: 'Im', color: textColor, font: { size: 18, weight: '600' } } }
+                    },
+                    plugins: { legend: { display: false } }
+                },
+                plugins: [{
+                    id: 'solidBg',
+                    beforeDraw(c) {
+                        const { ctx, width, height } = c;
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'destination-over';
+                        ctx.fillStyle = bgColor;
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.restore();
+                    }
+                }]
+            });
+            const img = chart.toBase64Image('image/jpeg', 0.92);
+            chart.destroy();
+            document.body.removeChild(off);
+            return { img, w: FW, h: FH };
+        }
+
         // Builds and downloads a clean PDF report (formula, the 3 data cards, both charts) using jsPDF directly, without screenshotting the page.
         function downloadPDF() {
             const jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
@@ -1077,14 +1816,14 @@
             const pageH = doc.internal.pageSize.getHeight();
             const marginX = 15;
             const usableW = pageW - marginX * 2;
-            let y = 18;
+            let y = 28;
 
             const textDark = [28, 25, 23], textGray = [107, 114, 128], ruleGray = [225, 220, 210], accent = [30, 58, 138];
             const setC = c => doc.setTextColor(c[0], c[1], c[2]);
             const setD = c => doc.setDrawColor(c[0], c[1], c[2]);
 
             // Adds a new PDF page if the next block of content wouldn't fit on the remainder of the current one.
-            function ensureSpace(h) { if (y + h > pageH - 15) { doc.addPage(); y = 18; } }
+            function ensureSpace(h) { if (y + h > pageH - 15) { doc.addPage(); y = 28; } }
 
             // jsPDF's built-in fonts only cover the Latin-1 (WinAnsi) character
             // set; glyphs like 𝜔, ∞, ≈ render broken — swap in safe equivalents.
@@ -1214,6 +1953,72 @@
             const { datasetsMag, datasetsPhase } = buildChartDatasets(lastMagData, lastPhaseData, lastAsympMagData, lastAsympPhaseData, lastContributionCurves);
             addChartImage(datasetsMag, 'dB', 'title-mag');
             addChartImage(datasetsPhase, '°', 'title-phase');
+
+            // ── Temporal response chart + KPI table ──────────────────────
+            if (lastTemporalData) {
+                const exp = renderExportTemporalChart();
+                if (exp) {
+                    const drawW = usableW, drawH = drawW * (exp.h / exp.w);
+                    ensureSpace(drawH + 16);
+                    sectionHeader(getText('lbl-temporal-title'), textGray, 10);
+                    y += 10;
+                    doc.addImage(exp.img, 'JPEG', marginX, y, drawW, drawH);
+                    y += drawH + 12;
+                }
+
+                const kpiRows = [
+                    ['lbl-overshoot', 'val-overshoot'],
+                    ['lbl-yss', 'val-yss'],
+                    ['lbl-ess', 'val-ess'],
+                    ['lbl-tr', 'val-tr'],
+                    ['lbl-ts', 'val-ts']
+                ];
+                const kpiRowH = 6.4, kpiCardH = 9 + kpiRows.length * kpiRowH;
+                ensureSpace(kpiCardH + 8);
+                sectionHeader(getText('lbl-temporal-title') + ' — KPI', accent, 10.5);
+                let kpiRy = y + 13;
+                kpiRows.forEach(([labelId, valueId]) => {
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); setC(textGray);
+                    doc.text(getText(labelId), marginX, kpiRy);
+                    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); setC(textDark);
+                    doc.text(getText(valueId) || '--', marginX + usableW, kpiRy, { align: 'right' });
+                    kpiRy += kpiRowH;
+                });
+                y += kpiCardH + 8;
+            }
+
+            // ── Nyquist diagram + parameters ─────────────────────────────
+            if (lastNyquistData) {
+                const nyqExp = renderExportNyquistChart();
+                if (nyqExp) {
+                    const drawW = usableW, drawH = drawW * (nyqExp.h / nyqExp.w);
+                    ensureSpace(drawH + 16);
+                    sectionHeader(getText('lbl-nyquist-title'), textGray, 10);
+                    y += 10;
+                    doc.addImage(nyqExp.img, 'JPEG', marginX, y, drawW, drawH);
+                    y += drawH + 12;
+                }
+
+                const nyqRows = [
+                    ['lbl-nyquist-stability', 'val-nyquist-stability'],
+                    ['lbl-nyquist-p', 'val-nyquist-p'],
+                    ['lbl-nyquist-n', 'val-nyquist-n'],
+                    ['lbl-nyquist-z', 'val-nyquist-z'],
+                    ['lbl-nyquist-dist', 'val-nyquist-dist']
+                ];
+                const nyqRowH = 6.4, nyqCardH = 9 + nyqRows.length * nyqRowH;
+                ensureSpace(nyqCardH + 8);
+                sectionHeader(getText('lbl-nyquist-title'), accent, 10.5);
+                let nyqRy = y + 13;
+                nyqRows.forEach(([labelId, valueId]) => {
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); setC(textGray);
+                    doc.text(getText(labelId), marginX, nyqRy);
+                    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); setC(textDark);
+                    doc.text(getText(valueId) || '--', marginX + usableW, nyqRy, { align: 'right' });
+                    nyqRy += nyqRowH;
+                });
+                y += nyqCardH + 8;
+            }
 
             doc.save('Bode_Analysis.pdf');
         }

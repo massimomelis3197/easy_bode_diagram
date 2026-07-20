@@ -37,4 +37,45 @@
         .dock-btn:hover .dock-pill:not(.is-active) { opacity: 0.5; transform: scale(0.9); }
         .dock-icon-wrap { position: relative; z-index: 1; }
         .dock-btn > span:last-child { position: relative; z-index: 1; }
+
+        /* Custom signal dropdown (Studio della Risposta Temporale): fade + scale
+           transition instead of an abrupt show/hide, kept out of layout flow via
+           opacity/pointer-events so it never causes a reflow while animating. */
+        .signal-menu {
+            opacity: 0;
+            transform: translateY(-8px) scale(0.98);
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+        .signal-menu.open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        .signal-option { transition: background-color 0.15s ease; }
+
+        /* Input/Output legend pills above the temporal response chart —
+           big, fully rounded buttons matching the dock's rounded-full look.
+           Active (visible) state gets a soft tinted background; clicking
+           toggles the corresponding dataset on the chart. */
+        .legend-pill {
+            background: transparent;
+            color: var(--legend-color, #6b7280);
+            border: 1.5px solid transparent;
+            cursor: pointer;
+        }
+        .legend-pill.active {
+            background: color-mix(in srgb, var(--legend-color, #6b7280) 14%, transparent);
+            border-color: color-mix(in srgb, var(--legend-color, #6b7280) 35%, transparent);
+        }
+        .legend-pill.inactive { opacity: 0.4; }
+
+        /* Marks a chart as "active": clicking a chart enables mouse-wheel
+           zoom just for that one (so scrolling the page elsewhere never
+           accidentally zooms a chart) — this ring is the visual cue. */
+        canvas.chart-zoom-active {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+            border-radius: 8px;
+        }
     
