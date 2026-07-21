@@ -78,4 +78,25 @@
             outline-offset: 2px;
             border-radius: 8px;
         }
+
+        /* Compact per-chart mini-dock (duplicated Reale/Asintoti/Contributi
+           controls inside the magnitude and phase cards) — same active-color
+           convention as the main floating dock (amber in light mode, blue
+           in dark mode), just smaller. */
+        .mini-dock-btn {
+            color: #9ca3af;
+            background: transparent;
+            border: 1px solid transparent;
+        }
+        .dark .mini-dock-btn { color: #6b7280; }
+        .mini-dock-btn.mini-dock-active {
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.12);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+        .dark .mini-dock-btn.mini-dock-active {
+            color: #3b82f6;
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
     

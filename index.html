@@ -204,6 +204,21 @@
                             <canvas id="magnitudeChart"></canvas>
                         </div>
                     </div>
+                    <div class="mini-dock flex items-center flex-wrap justify-center lg:justify-start gap-1.5 sm:gap-2 lg:gap-3 mt-2 pt-2 border-t border-stone-100 dark:border-darkborder" id="mini-dock-mag">
+                        <button type="button" onclick="toggleLocalLayer('mag','real')" id="mini-btn-mag-real" class="mini-dock-btn flex items-center gap-1 lg:gap-1.5 px-2 sm:px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-[9px] sm:text-[10px] lg:text-xs font-bold transition-all cursor-pointer">
+                            <i data-lucide="line-chart" class="w-3 h-3 lg:w-3.5 lg:h-3.5"></i>
+                            <span id="mini-lbl-mag-real">Reale</span>
+                        </button>
+                        <button type="button" onclick="toggleLocalLayer('mag','asymptotic')" id="mini-btn-mag-asymptotic" class="mini-dock-btn flex items-center gap-1 lg:gap-1.5 px-2 sm:px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-[9px] sm:text-[10px] lg:text-xs font-bold transition-all cursor-pointer">
+                            <i data-lucide="trending-up" class="w-3 h-3 lg:w-3.5 lg:h-3.5"></i>
+                            <span id="mini-lbl-mag-asymp">Asintoti</span>
+                        </button>
+                        <button type="button" onclick="toggleLocalLayer('mag','contributions')" id="mini-btn-mag-contributions" class="mini-dock-btn flex items-center gap-1 lg:gap-1.5 px-2 sm:px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-[9px] sm:text-[10px] lg:text-xs font-bold transition-all cursor-pointer">
+                            <i data-lucide="layers" class="w-3 h-3 lg:w-3.5 lg:h-3.5"></i>
+                            <span id="mini-lbl-mag-contrib">Contributi</span>
+                        </button>
+                        <div class="hidden lg:flex flex-wrap items-center gap-1.5 ml-1" id="mini-contrib-pills-mag"></div>
+                    </div>
                 </div>
                 <div class="card p-2 sm:p-6 rounded-2xl sm:rounded-3xl border shadow-sm h-[360px] sm:h-[560px] flex flex-col" style="page-break-inside: avoid; break-inside: avoid;">
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider mb-1 sm:mb-4 px-2 pt-1 sm:px-0 sm:pt-0 text-stone-500 dark:text-gray-400" id="title-phase">Diagramma della Fase</h2>
@@ -211,6 +226,21 @@
                         <div class="h-full min-w-[640px] sm:min-w-0 relative">
                             <canvas id="phaseChart"></canvas>
                         </div>
+                    </div>
+                    <div class="mini-dock flex items-center flex-wrap justify-center lg:justify-start gap-1.5 sm:gap-2 lg:gap-3 mt-2 pt-2 border-t border-stone-100 dark:border-darkborder" id="mini-dock-phase">
+                        <button type="button" onclick="toggleLocalLayer('phase','real')" id="mini-btn-phase-real" class="mini-dock-btn flex items-center gap-1 lg:gap-1.5 px-2 sm:px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-[9px] sm:text-[10px] lg:text-xs font-bold transition-all cursor-pointer">
+                            <i data-lucide="line-chart" class="w-3 h-3 lg:w-3.5 lg:h-3.5"></i>
+                            <span id="mini-lbl-phase-real">Reale</span>
+                        </button>
+                        <button type="button" onclick="toggleLocalLayer('phase','asymptotic')" id="mini-btn-phase-asymptotic" class="mini-dock-btn flex items-center gap-1 lg:gap-1.5 px-2 sm:px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-[9px] sm:text-[10px] lg:text-xs font-bold transition-all cursor-pointer">
+                            <i data-lucide="trending-up" class="w-3 h-3 lg:w-3.5 lg:h-3.5"></i>
+                            <span id="mini-lbl-phase-asymp">Asintoti</span>
+                        </button>
+                        <button type="button" onclick="toggleLocalLayer('phase','contributions')" id="mini-btn-phase-contributions" class="mini-dock-btn flex items-center gap-1 lg:gap-1.5 px-2 sm:px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-[9px] sm:text-[10px] lg:text-xs font-bold transition-all cursor-pointer">
+                            <i data-lucide="layers" class="w-3 h-3 lg:w-3.5 lg:h-3.5"></i>
+                            <span id="mini-lbl-phase-contrib">Contributi</span>
+                        </button>
+                        <div class="hidden lg:flex flex-wrap items-center gap-1.5 ml-1" id="mini-contrib-pills-phase"></div>
                     </div>
                 </div>
             </main>
@@ -268,13 +298,13 @@
 
                     <!-- Chart + custom legend (2/3) -->
                     <div class="flex flex-col gap-3 lg:col-span-2 min-w-0">
-                        <div class="flex items-center justify-end gap-3" id="temporal-legend">
-                            <button type="button" onclick="toggleTemporalDataset(0)" id="legend-btn-output" class="legend-pill flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all">
-                                <span class="w-3 h-3 rounded-full shrink-0" id="legend-dot-output"></span>
+                        <div class="flex items-center justify-start sm:justify-end gap-2 sm:gap-3" id="temporal-legend">
+                            <button type="button" onclick="toggleTemporalDataset(0)" id="legend-btn-output" class="legend-pill flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all">
+                                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0" id="legend-dot-output"></span>
                                 <span id="legend-label-output">Uscita</span>
                             </button>
-                            <button type="button" onclick="toggleTemporalDataset(1)" id="legend-btn-input" class="legend-pill flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all">
-                                <span class="w-3 h-3 rounded-full shrink-0" id="legend-dot-input"></span>
+                            <button type="button" onclick="toggleTemporalDataset(1)" id="legend-btn-input" class="legend-pill flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all">
+                                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0" id="legend-dot-input"></span>
                                 <span id="legend-label-input">Ingresso</span>
                             </button>
                         </div>
@@ -317,12 +347,12 @@
                             <span class="block text-[11px] lg:text-[13px] text-stone-500 dark:text-gray-400 mb-0" id="lbl-nyquist-dist">Distanza min. da (-1,0)</span>
                             <span class="text-sm font-semibold text-stone-700 dark:text-gray-300" id="val-nyquist-dist">--</span>
                         </div>
+                        <p class="text-[11px] text-stone-400 dark:text-gray-500 pt-1.5 border-t border-stone-100 dark:border-darkborder leading-relaxed" id="lbl-nyquist-zoom-hint">Scorri per zoom, trascina per spostare. Il PDF salverà l'ultimo zoom e l'ultimo trascinamento da te scelto.</p>
                     </div>
 
                     <!-- Chart (2/3) -->
                     <div class="lg:col-span-2 min-w-0">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-[11px] text-stone-400 dark:text-gray-500" id="lbl-nyquist-zoom-hint">Scorri per zoom, trascina per spostare</span>
+                        <div class="flex items-center justify-end mb-2">
                             <button type="button" onclick="resetNyquistZoom()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-stone-600 dark:text-gray-300 bg-stone-100 dark:bg-darkbg border border-stone-200 dark:border-darkborder hover:border-stone-300 dark:hover:border-gray-500 transition-all cursor-pointer">
                                 <i data-lucide="maximize" class="w-3.5 h-3.5"></i>
                                 <span id="lbl-nyquist-reset">Reset Zoom</span>

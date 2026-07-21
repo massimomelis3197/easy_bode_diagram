@@ -52,6 +52,14 @@
         let currentLang = 'it';
         let currentUnit = 'Hz';
         let activeLayers = { real: true, asymptotic: false, contributions: false };
+        // Per-chart overrides so the magnitude and phase diagrams can be
+        // shown/hidden independently via their own mini-dock — reset to
+        // match the shared `activeLayers` (the floating dock) each time a
+        // new calculation runs, but can diverge afterward per chart.
+        let activeLayersMag = { real: true, asymptotic: false, contributions: false };
+        let activeLayersPhase = { real: true, asymptotic: false, contributions: false };
+        let contributionVisibilityMag = {};
+        let contributionVisibilityPhase = {};
         let isInterfaceExpanded = false;
 
         let lastFreqDisplay = [], lastFreqRad = [], lastMagData = [], lastPhaseData = [], lastAsympMagData = [], lastAsympPhaseData = [], lastContributionCurves = [];
@@ -90,7 +98,7 @@
             poleWord: 'Polo', zeroWord: 'Zero', ccWord: 'c.c.', originWord: 'origine',
             temporalTitle: 'Studio della Risposta Temporale', sigStep: 'Gradino Unitario', sigImpulse: 'Impulso', sigRamp: 'Rampa', sigSquare: 'Onda Quadra', sigSine: 'Sinusoide', lblYss: 'Valore di Regime', lblEss: 'Errore a Regime', lblTr: 'Tempo di Salita', lblTs: 'Tempo di Assestamento', lblOvershoot: 'Sovraelongazione Max', inputLbl: 'Ingresso', outputLbl: 'Uscita',
             nyquistTitle: 'Diagramma di Nyquist', lblP: 'Poli Instabili (P)', lblN: 'Avvolgimenti (N)', lblZ: 'Poli Instabili A.C. (Z)', lblDist: 'Distanza min. da (-1,0)',
-            nyquistZoomHint: 'Scorri per zoom, trascina per spostare', nyquistResetZoom: 'Reset Zoom'
+            nyquistZoomHint: 'Scorri per zoom, trascina per spostare. Il PDF salverà l\'ultimo zoom e l\'ultimo trascinamento da te scelto.', nyquistResetZoom: 'Reset Zoom'
         },
         en: {
             title: 'Welcome to <span class="font-bold"> Easy Bode </span>',
@@ -112,7 +120,7 @@
             poleWord: 'Pole', zeroWord: 'Zero', ccWord: 'cc', originWord: 'origin',
             temporalTitle: 'Time Response Study', sigStep: 'Unit Step', sigImpulse: 'Impulse', sigRamp: 'Ramp', sigSquare: 'Square Wave', sigSine: 'Sine Wave', lblYss: 'Steady-State Value', lblEss: 'Steady-State Error', lblTr: 'Rise Time', lblTs: 'Settling Time', lblOvershoot: 'Max Overshoot', inputLbl: 'Input', outputLbl: 'Output',
             nyquistTitle: 'Nyquist Diagram', lblP: 'Unstable Poles (P)', lblN: 'Encirclements (N)', lblZ: 'Unstable CL Poles (Z)', lblDist: 'Min. Distance from (-1,0)',
-            nyquistZoomHint: 'Scroll to zoom, drag to pan', nyquistResetZoom: 'Reset Zoom'
+            nyquistZoomHint: 'Scroll to zoom, drag to pan. The PDF will save the last zoom and pan you chose.', nyquistResetZoom: 'Reset Zoom'
         },
         fr: {
             title: 'Bienvenue sur <span class="font-bold"> Easy Bode </span>',
@@ -134,7 +142,7 @@
             poleWord: 'Pôle', zeroWord: 'Zéro', ccWord: 'c.c.', originWord: 'origine',
             temporalTitle: 'Étude de la Réponse Temporelle', sigStep: 'Échelon Unitaire', sigImpulse: 'Impulsion', sigRamp: 'Rampe', sigSquare: 'Onde Carrée', sigSine: 'Sinusoïde', lblYss: 'Valeur de Régime', lblEss: 'Erreur de Régime', lblTr: 'Temps de Montée', lblTs: 'Temps d\'Établissement', lblOvershoot: 'Dépassement Max', inputLbl: 'Entrée', outputLbl: 'Sortie',
             nyquistTitle: 'Diagramme de Nyquist', lblP: 'Pôles Instables (P)', lblN: 'Encerclements (N)', lblZ: 'Pôles Instables B.F. (Z)', lblDist: 'Distance min. de (-1,0)',
-            nyquistZoomHint: 'Molette pour zoomer, glisser pour déplacer', nyquistResetZoom: 'Réinitialiser'
+            nyquistZoomHint: 'Molette pour zoomer, glisser pour déplacer. Le PDF conservera le dernier zoom et déplacement choisis.', nyquistResetZoom: 'Réinitialiser'
         },
         de: {
             title: 'Willkommen bei <span class="font-bold"> Easy Bode </span>',
@@ -156,7 +164,7 @@
             poleWord: 'Pol', zeroWord: 'Nullstelle', ccWord: 'k.k.', originWord: 'Ursprung',
             temporalTitle: 'Zeitantwort-Analyse', sigStep: 'Einheitssprung', sigImpulse: 'Impuls', sigRamp: 'Rampe', sigSquare: 'Rechteckwelle', sigSine: 'Sinuswelle', lblYss: 'Beharrungswert', lblEss: 'Regelabweichung', lblTr: 'Anstiegszeit', lblTs: 'Einschwingzeit', lblOvershoot: 'Max. Überschwingen', inputLbl: 'Eingang', outputLbl: 'Ausgang',
             nyquistTitle: 'Nyquist-Diagramm', lblP: 'Instabile Pole (P)', lblN: 'Umschlingungen (N)', lblZ: 'Instabile Pole g.K. (Z)', lblDist: 'Min. Abstand von (-1,0)',
-            nyquistZoomHint: 'Scrollen zum Zoomen, Ziehen zum Verschieben', nyquistResetZoom: 'Zoom zurücksetzen'
+            nyquistZoomHint: 'Scrollen zum Zoomen, Ziehen zum Verschieben. Das PDF speichert den zuletzt gewählten Zoom und die Verschiebung.', nyquistResetZoom: 'Zoom zurücksetzen'
         },
         es: {
             title: 'Bienvenido a <span class="font-bold"> Easy Bode </span>',
@@ -178,7 +186,7 @@
             poleWord: 'Polo', zeroWord: 'Cero', ccWord: 'c.c.', originWord: 'origen',
             temporalTitle: 'Estudio de la Respuesta Temporal', sigStep: 'Escalón Unitario', sigImpulse: 'Impulso', sigRamp: 'Rampa', sigSquare: 'Onda Cuadrada', sigSine: 'Onda Senoidal', lblYss: 'Valor de Régimen', lblEss: 'Error de Régimen', lblTr: 'Tiempo de Subida', lblTs: 'Tiempo de Establecimiento', lblOvershoot: 'Sobreoscilación Máx.', inputLbl: 'Entrada', outputLbl: 'Salida',
             nyquistTitle: 'Diagrama de Nyquist', lblP: 'Polos Inestables (P)', lblN: 'Rodeos (N)', lblZ: 'Polos Inestables L.C. (Z)', lblDist: 'Distancia mín. a (-1,0)',
-            nyquistZoomHint: 'Desplaza para zoom, arrastra para mover', nyquistResetZoom: 'Restablecer Zoom'
+            nyquistZoomHint: 'Desplaza para zoom, arrastra para mover. El PDF guardará el último zoom y desplazamiento elegidos.', nyquistResetZoom: 'Restablecer Zoom'
         },
         zh: {
             title: '欢迎来到 <span class="font-bold"> Easy Bode </span>',
@@ -200,7 +208,7 @@
             poleWord: '极点', zeroWord: '零点', ccWord: '共轭', originWord: '原点',
             temporalTitle: '时间响应研究', sigStep: '单位阶跃', sigImpulse: '冲激', sigRamp: '斜坡', sigSquare: '方波', sigSine: '正弦波', lblYss: '稳态值', lblEss: '稳态误差', lblTr: '上升时间', lblTs: '调节时间', lblOvershoot: '最大超调量', inputLbl: '输入', outputLbl: '输出',
             nyquistTitle: '奈奎斯特图', lblP: '不稳定极点 (P)', lblN: '环绕次数 (N)', lblZ: '闭环不稳定极点 (Z)', lblDist: '距(-1,0)最小距离',
-            nyquistZoomHint: '滚动缩放，拖动平移', nyquistResetZoom: '重置缩放'
+            nyquistZoomHint: '滚动缩放，拖动平移。PDF 将保存您选择的最后缩放和平移状态。', nyquistResetZoom: '重置缩放'
         },
         pt: {
             title: 'Bem-vindo ao <span class="font-bold"> Easy Bode </span>',
@@ -222,7 +230,7 @@
             poleWord: 'Polo', zeroWord: 'Zero', ccWord: 'c.c.', originWord: 'origem',
             temporalTitle: 'Estudo da Resposta Temporal', sigStep: 'Degrau Unitário', sigImpulse: 'Impulso', sigRamp: 'Rampa', sigSquare: 'Onda Quadrada', sigSine: 'Onda Senoidal', lblYss: 'Valor de Regime', lblEss: 'Erro de Regime', lblTr: 'Tempo de Subida', lblTs: 'Tempo de Acomodação', lblOvershoot: 'Sobressinal Máx.', inputLbl: 'Entrada', outputLbl: 'Saída',
             nyquistTitle: 'Diagrama de Nyquist', lblP: 'Polos Instáveis (P)', lblN: 'Envolvimentos (N)', lblZ: 'Polos Instáveis M.F. (Z)', lblDist: 'Distância mín. de (-1,0)',
-            nyquistZoomHint: 'Role para zoom, arraste para mover', nyquistResetZoom: 'Redefinir Zoom'
+            nyquistZoomHint: 'Role para zoom, arraste para mover. O PDF salvará o último zoom e deslocamento escolhidos.', nyquistResetZoom: 'Redefinir Zoom'
         },
         ja: {
             title: '<span class="font-bold"> Easy Bode </span> へようこそ',
@@ -244,7 +252,7 @@
             poleWord: '極', zeroWord: '零点', ccWord: '共役', originWord: '原点',
             temporalTitle: '時間応答の研究', sigStep: '単位ステップ', sigImpulse: 'インパルス', sigRamp: 'ランプ', sigSquare: '方形波', sigSine: '正弦波', lblYss: '定常値', lblEss: '定常偏差', lblTr: '立ち上がり時間', lblTs: '整定時間', lblOvershoot: '最大オーバーシュート', inputLbl: '入力', outputLbl: '出力',
             nyquistTitle: 'ナイキスト線図', lblP: '不安定極 (P)', lblN: '周回数 (N)', lblZ: '閉ループ不安定極 (Z)', lblDist: '(-1,0)からの最小距離',
-            nyquistZoomHint: 'スクロールでズーム、ドラッグで移動', nyquistResetZoom: 'ズームをリセット'
+            nyquistZoomHint: 'スクロールでズーム、ドラッグで移動。PDFには最後に選択したズームとパンが保存されます。', nyquistResetZoom: 'ズームをリセット'
         },
         ar: {
             title: 'مرحبًا بك في <span class="font-bold"> Easy Bode </span>',
@@ -266,7 +274,7 @@
             poleWord: 'قطب', zeroWord: 'صفر', ccWord: 'مترافق', originWord: 'الأصل',
             temporalTitle: 'دراسة الاستجابة الزمنية', sigStep: 'خطوة الوحدة', sigImpulse: 'نبضة', sigRamp: 'منحدر', sigSquare: 'موجة مربعة', sigSine: 'موجة جيبية', lblYss: 'قيمة الاستقرار', lblEss: 'خطأ الاستقرار', lblTr: 'زمن الصعود', lblTs: 'زمن الاستقرار', lblOvershoot: 'أقصى تجاوز', inputLbl: 'الدخل', outputLbl: 'الخرج',
             nyquistTitle: 'مخطط نايكويست', lblP: 'أقطاب غير مستقرة (P)', lblN: 'عدد الإحاطات (N)', lblZ: 'أقطاب حلقة مغلقة غير مستقرة (Z)', lblDist: 'أدنى مسافة من (-1,0)',
-            nyquistZoomHint: 'مرر للتكبير، اسحب للتحريك', nyquistResetZoom: 'إعادة ضبط التكبير'
+            nyquistZoomHint: 'مرر للتكبير، اسحب للتحريك. سيحفظ ملف PDF آخر تكبير وتحريك اخترته.', nyquistResetZoom: 'إعادة ضبط التكبير'
         },
         hi: {
             title: '<span class="font-bold"> Easy Bode </span> में आपका स्वागत है',
@@ -288,7 +296,7 @@
             poleWord: 'ध्रुव', zeroWord: 'शून्य', ccWord: 'संयुग्मी', originWord: 'मूल',
             temporalTitle: 'समय अनुक्रिया अध्ययन', sigStep: 'यूनिट स्टेप', sigImpulse: 'इम्पल्स', sigRamp: 'रैंप', sigSquare: 'स्क्वायर वेव', sigSine: 'साइन वेव', lblYss: 'स्थिर अवस्था मान', lblEss: 'स्थिर अवस्था त्रुटि', lblTr: 'राइज़ टाइम', lblTs: 'सेटलिंग टाइम', lblOvershoot: 'अधिकतम ओवरशूट', inputLbl: 'इनपुट', outputLbl: 'आउटपुट',
             nyquistTitle: 'नाइक्विस्ट आरेख', lblP: 'अस्थिर ध्रुव (P)', lblN: 'परिक्रमाएँ (N)', lblZ: 'क्लोज्ड-लूप अस्थिर ध्रुव (Z)', lblDist: '(-1,0) से न्यूनतम दूरी',
-            nyquistZoomHint: 'ज़ूम के लिए स्क्रॉल करें, खिसकाने के लिए खींचें', nyquistResetZoom: 'ज़ूम रीसेट करें'
+            nyquistZoomHint: 'ज़ूम के लिए स्क्रॉल करें, खिसकाने के लिए खींचें। PDF आपके द्वारा चुने गए अंतिम ज़ूम और खिसकाव को सहेजेगा।', nyquistResetZoom: 'ज़ूम रीसेट करें'
         }
 }
 
@@ -363,6 +371,11 @@
             document.getElementById('lbl-real').textContent = L.real;
             document.getElementById('lbl-asymp').textContent = L.asymp;
             document.getElementById('lbl-contrib').textContent = L.contrib;
+            ['mag', 'phase'].forEach(key => {
+                document.getElementById(`mini-lbl-${key}-real`).textContent = L.real;
+                document.getElementById(`mini-lbl-${key}-asymp`).textContent = L.asymp;
+                document.getElementById(`mini-lbl-${key}-contrib`).textContent = L.contrib;
+            });
 
             document.getElementById('lbl-temporal-title').textContent = L.temporalTitle;
             document.getElementById('lbl-overshoot').textContent = L.lblOvershoot;
@@ -477,6 +490,65 @@
       
         renderCharts(lastFreqDisplay, lastMagData, lastPhaseData, lastAsympMagData, lastAsympPhaseData, lastContributionCurves);
     }
+}
+
+// Toggles one layer on just the magnitude or just the phase chart's own
+// mini-dock, independent of the other chart and of the shared floating
+// dock — rebuilds only that one chart's datasets, without recalculating.
+function toggleLocalLayer(chartKey, layer) {
+    const state = chartKey === 'mag' ? activeLayersMag : activeLayersPhase;
+    state[layer] = !state[layer];
+    updateMiniDockUI(chartKey);
+    renderMiniContribPills(chartKey);
+    rerenderSingleChart(chartKey);
+}
+
+// Syncs one mini-dock's button styling to its chart's current layer state.
+function updateMiniDockUI(chartKey) {
+    const state = chartKey === 'mag' ? activeLayersMag : activeLayersPhase;
+    ['real', 'asymptotic', 'contributions'].forEach(l => {
+        const btn = document.getElementById(`mini-btn-${chartKey}-${l}`);
+        if (btn) btn.classList.toggle('mini-dock-active', !!state[l]);
+    });
+}
+
+// Shows the individual pole/zero/K pills to the right of a mini-dock's
+// "Contributi" button — same principle as the main floating dock's pill
+// row, but independent per chart (desktop only; hidden via CSS on mobile).
+function renderMiniContribPills(chartKey) {
+    const container = document.getElementById(`mini-contrib-pills-${chartKey}`);
+    if (!container) return;
+    const layers = chartKey === 'mag' ? activeLayersMag : activeLayersPhase;
+    const visibility = chartKey === 'mag' ? contributionVisibilityMag : contributionVisibilityPhase;
+    if (!layers.contributions || !lastContributionCurves.length) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = lastContributionCurves.map(c => {
+        const visible = visibility[c.id] !== false;
+        return `<button type="button" onclick="toggleLocalContribution('${chartKey}','${c.id}')"
+            class="text-[9px] font-semibold px-2 py-1 rounded-full border transition-all whitespace-nowrap cursor-pointer ${visible ? 'opacity-100' : 'opacity-30'}"
+            style="border-color:${c.color}; color:${c.color};">${c.label}</button>`;
+    }).join('');
+}
+
+// Toggles one contribution's visibility for just one chart's mini-dock.
+function toggleLocalContribution(chartKey, id) {
+    const visibility = chartKey === 'mag' ? contributionVisibilityMag : contributionVisibilityPhase;
+    visibility[id] = !(visibility[id] !== false);
+    renderMiniContribPills(chartKey);
+    rerenderSingleChart(chartKey);
+}
+
+// Rebuilds just one chart's datasets from the cached data, without
+// touching the other chart or re-running the full calculation.
+function rerenderSingleChart(chartKey) {
+    const isPhase = chartKey === 'phase';
+    const layers = isPhase ? activeLayersPhase : activeLayersMag;
+    const visibility = isPhase ? contributionVisibilityPhase : contributionVisibilityMag;
+    const datasets = buildDatasetsForChart(lastMagData, lastPhaseData, lastAsympMagData, lastAsympPhaseData, lastContributionCurves, layers, isPhase, visibility);
+    const chart = isPhase ? phaseChart : magChart;
+    if (chart) { chart.data.datasets = datasets; chart.update(); }
 }
 
         // Shows or hides a single pole/zero/gain contribution curve from the charts.
@@ -1400,9 +1472,33 @@
         // large) pole/zero makes the full curve span many orders of
         // magnitude — without this, systems like that required a lot of
         // manual zooming just to see anything.
+        // The default view shown when the diagram is first drawn. The
+        // stability-relevant part of ANY Nyquist curve (the crossings near
+        // the critical point -1+j0) always lives in a small, predictable
+        // window around the origin — regardless of how extreme the
+        // system's poles/zeros are elsewhere in frequency. A percentile/
+        // median-based heuristic was still fragile (some systems still
+        // needed a lot of manual zooming), so this uses a fixed, always-
+        // consistent default window instead, matching what tools like
+        // Wolfram Alpha or MATLAB show immediately for any system. Only
+        // falls back to a computed window for the rare pathological case
+        // where the curve never comes anywhere near that default at all
+        // (e.g. an extremely low- or high-gain system).
         function computeNyquistInitialView(posBranch) {
-            const mags = posBranch.map(p => Math.hypot(p.x, p.y)).filter(m => isFinite(m)).sort((a, b) => a - b);
-            const bound = mags.length ? Math.min(Math.max(mags[Math.floor(mags.length * 0.5)] * 3, 4), 20) : 5;
+            const DEFAULT_BOUND = 5;
+            const mags = posBranch.map(p => Math.hypot(p.x, p.y)).filter(m => isFinite(m));
+            const hasNearbyPoint = mags.some(m => m < DEFAULT_BOUND * 1.5);
+            if (hasNearbyPoint || !mags.length) {
+                return { xMin: -DEFAULT_BOUND, xMax: DEFAULT_BOUND, yMin: -DEFAULT_BOUND, yMax: DEFAULT_BOUND };
+            }
+            // Curve never approaches the default window: center on whichever
+            // point's magnitude is closest to 1 (the crossover-like region).
+            let bestMag = mags[0], bestDiff = Infinity;
+            mags.forEach(m => {
+                const d = Math.abs(Math.log10(m || 1e-12));
+                if (d < bestDiff) { bestDiff = d; bestMag = m; }
+            });
+            const bound = Math.max(bestMag * 3, DEFAULT_BOUND);
             return { xMin: -bound, xMax: bound, yMin: -bound, yMax: bound };
         }
 
@@ -1552,32 +1648,43 @@
 
         // ── Render Charts ─────────────────────────────────────────────────────
         // Assembles the Chart.js dataset arrays (real curve, asymptotes, individual contributions) according to which visualization layers are currently active.
-        function buildChartDatasets(magData, phaseData, asympMagData, asympPhaseData, contributionCurves) {
+        // Builds the dataset array for one chart (magnitude or phase) using
+        // the given layer-visibility state — factored out so the mini-docks
+        // can rebuild just one chart independently of the other.
+        function buildDatasetsForChart(magData, phaseData, asympMagData, asympPhaseData, contributionCurves, layers, isPhase, visibilityMap) {
             contributionCurves = contributionCurves || [];
-            const datasetsMag = [], datasetsPhase = [];
+            visibilityMap = visibilityMap || contributionVisibility;
+            const datasets = [];
+            const mainData = isPhase ? phaseData : magData;
+            const asympData = isPhase ? asympPhaseData : asympMagData;
+            const unitLabel = isPhase ? ' (°)' : ' (dB)';
+            const dataKey = isPhase ? 'dataPhase' : 'dataMag';
+            const asympKey = isPhase ? 'dataPhaseAsymp' : 'dataMagAsymp';
 
-            if (activeLayers.real) {
+            if (layers.real) {
                 const realColor = isDarkMode ? '#f5efe0' : '#000000';
-                datasetsMag.push({ label: t('real') + ' (dB)', data: magData, borderColor: realColor, borderWidth: 2, tension: 0.4, pointRadius: 0 });
-                datasetsPhase.push({ label: t('real') + ' (°)', data: phaseData, borderColor: realColor, borderWidth: 2, tension: 0.4, pointRadius: 0 });
+                datasets.push({ label: t('real') + unitLabel, data: mainData, borderColor: realColor, borderWidth: 2, tension: 0.4, pointRadius: 0 });
             }
-            if (activeLayers.asymptotic) {
-                datasetsMag.push({ label: t('asymp') + ' (dB)', data: asympMagData, borderColor: '#10b981', borderDash: [5, 5], borderWidth: 2, pointRadius: 0 });
-                datasetsPhase.push({ label: t('asymp') + ' (°)', data: asympPhaseData, borderColor: '#10b981', borderDash: [5, 5], borderWidth: 2, pointRadius: 0 });
+            if (layers.asymptotic) {
+                datasets.push({ label: t('asymp') + unitLabel, data: asympData, borderColor: '#10b981', borderDash: [5, 5], borderWidth: 2, pointRadius: 0 });
             }
-            if (activeLayers.contributions) {
+            if (layers.contributions) {
                 contributionCurves.forEach(c => {
-                    if (contributionVisibility[c.id] === false) return;
-                    if (activeLayers.real) {
-                        datasetsMag.push({ data: c.dataMag, borderColor: c.color, borderWidth: 1.5, pointRadius: 0, tension: 0.4 });
-                        datasetsPhase.push({ data: c.dataPhase, borderColor: c.color, borderWidth: 1.5, pointRadius: 0, tension: 0.4 });
-                    }
-                    if (activeLayers.asymptotic && c.dataMagAsymp) {
-                        datasetsMag.push({ data: c.dataMagAsymp, borderColor: c.color, borderDash: [4, 4], borderWidth: 1, pointRadius: 0, tension: 0 });
-                        datasetsPhase.push({ data: c.dataPhaseAsymp, borderColor: c.color, borderDash: [4, 4], borderWidth: 1, pointRadius: 0, tension: 0 });
-                    }
+                    if (visibilityMap[c.id] === false) return;
+                    if (layers.real) datasets.push({ data: c[dataKey], borderColor: c.color, borderWidth: 1.5, pointRadius: 0, tension: 0.4 });
+                    if (layers.asymptotic && c[asympKey]) datasets.push({ data: c[asympKey], borderColor: c.color, borderDash: [4, 4], borderWidth: 1, pointRadius: 0, tension: 0 });
                 });
             }
+            return datasets;
+        }
+
+        function buildChartDatasets(magData, phaseData, asympMagData, asympPhaseData, contributionCurves, magLayers, phaseLayers, magVisibility, phaseVisibility) {
+            magLayers = magLayers || activeLayersMag;
+            phaseLayers = phaseLayers || activeLayersPhase;
+            magVisibility = magVisibility || contributionVisibilityMag;
+            phaseVisibility = phaseVisibility || contributionVisibilityPhase;
+            const datasetsMag = buildDatasetsForChart(magData, phaseData, asympMagData, asympPhaseData, contributionCurves, magLayers, false, magVisibility);
+            const datasetsPhase = buildDatasetsForChart(magData, phaseData, asympMagData, asympPhaseData, contributionCurves, phaseLayers, true, phaseVisibility);
             return { datasetsMag, datasetsPhase };
         }
 
@@ -1588,10 +1695,21 @@
             const magCtx = magCanvas.getContext('2d');
             const phaseCtx = phaseCanvas.getContext('2d');
 
+            // A fresh calculation resets each chart's individual mini-dock
+            // override back to whatever the shared floating dock shows.
+            activeLayersMag = { ...activeLayers };
+            activeLayersPhase = { ...activeLayers };
+            contributionVisibilityMag = { ...contributionVisibility };
+            contributionVisibilityPhase = { ...contributionVisibility };
+            updateMiniDockUI('mag');
+            updateMiniDockUI('phase');
+            renderMiniContribPills('mag');
+            renderMiniContribPills('phase');
+
             let gridColor = isDarkMode ? '#2a3441' : '#e5e7eb';
             let textColor = isDarkMode ? '#9aa7b8' : '#6b7280';
 
-            const { datasetsMag, datasetsPhase } = buildChartDatasets(magData, phaseData, asympMagData, asympPhaseData, contributionCurves);
+            const { datasetsMag, datasetsPhase } = buildChartDatasets(magData, phaseData, asympMagData, asympPhaseData, contributionCurves, activeLayersMag, activeLayersPhase);
 
             const isMobile = window.innerWidth < 640;
             const axisFontSize = isMobile ? 10 : 15;
@@ -1616,22 +1734,16 @@
                         }
                     },
                     plugins: {
-                        legend: { display: false },
-                        zoom: {
-                            pan: { enabled: true, mode: 'xy' },
-                            zoom: { wheel: { enabled: false }, pinch: { enabled: true }, mode: 'xy' } // wheel requires a click first — see activateChartZoom()
-                        }
+                        legend: { display: false }
                     }
                 };
             }
 
             if (magChart) magChart.destroy();
             magChart = new Chart(magCtx, { type: 'line', data: { labels, datasets: datasetsMag }, options: makeChartOptions('dB') });
-            makeChartClickActivatable(magChart, magCanvas);
 
             if (phaseChart) phaseChart.destroy();
             phaseChart = new Chart(phaseCtx, { type: 'line', data: { labels, datasets: datasetsPhase }, options: makeChartOptions('°') });
-            makeChartClickActivatable(phaseChart, phaseCanvas);
         }
 
         let resizeRedrawTimeout;
@@ -1755,7 +1867,14 @@
         // Renders the Nyquist chart off-screen at a fixed size/font for the PDF.
         function renderExportNyquistChart() {
             if (!lastNyquistData) return null;
-            const { posBranch, negBranch, fullBounds: bounds } = lastNyquistData;
+            const { posBranch, negBranch, fullBounds } = lastNyquistData;
+            // Reflect whatever zoom/pan the user currently has on the live
+            // chart (chartjs-plugin-zoom updates chart.scales in place), so
+            // the PDF matches exactly what they were looking at — falls back
+            // to the full bounding box if the live chart isn't available.
+            const bounds = (nyquistChart && nyquistChart.scales && nyquistChart.scales.x && nyquistChart.scales.y)
+                ? { xMin: nyquistChart.scales.x.min, xMax: nyquistChart.scales.x.max, yMin: nyquistChart.scales.y.min, yMax: nyquistChart.scales.y.max }
+                : fullBounds;
             const FW = 1600, FH = 900;
             const off = document.createElement('canvas');
             off.width = FW; off.height = FH;
